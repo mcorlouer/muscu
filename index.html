@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#111111" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Séance Pecs Dos" />
+  <title>Séance Pecs + Dos + Bras</title>
+  <style>
+    :root{
+      --bg:#0d0d0f; --card:#17171b; --card2:#202027; --text:#f6f6f7;
+      --muted:#a7a7b0; --accent:#ff6b35; --accent2:#ff9b73; --ok:#2ecc71;
+      --danger:#ff4d4f; --line:#2b2b33;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;background:var(--bg);color:var(--text);
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+      min-height:100vh;padding:env(safe-area-inset-top) 14px calc(90px + env(safe-area-inset-bottom));
+    }
+    .wrap{max-width:680px;margin:0 auto}
+    header{padding:14px 2px 10px;position:sticky;top:0;background:linear-gradient(var(--bg) 78%,transparent);z-index:5}
+    h1{font-size:24px;line-height:1.05;margin:6px 0 4px}
+    .sub{color:var(--muted);font-size:13px}
+    .progress-wrap{margin-top:12px}
+    .progress-line{height:8px;background:#26262d;border-radius:99px;overflow:hidden}
+    .progress{height:100%;width:0;background:var(--accent);transition:.25s}
+    .progress-text{font-size:12px;color:var(--muted);margin-top:6px;display:flex;justify-content:space-between}
+    .timer{
+      margin:12px 0 14px;padding:14px;border:1px solid var(--line);border-radius:18px;
+      background:linear-gradient(180deg,#1d1d22,#151519);display:flex;align-items:center;justify-content:space-between;gap:12px
+    }
+    .timer strong{font-size:34px;letter-spacing:.5px}
+    .timer small{display:block;color:var(--muted);margin-bottom:2px}
+    .timer-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+    button{
+      border:0;border-radius:12px;padding:11px 14px;font-weight:700;font-size:14px;
+      background:var(--card2);color:var(--text)
+    }
+    button.primary{background:var(--accent);color:white}
+    button.ghost{border:1px solid var(--line);background:transparent}
+    button.danger{background:#2a1516;color:#ff8a8c}
+    .card{
+      border:1px solid var(--line);background:var(--card);border-radius:20px;padding:16px;margin-bottom:12px;
+      box-shadow:0 10px 25px rgba(0,0,0,.18)
+    }
+    .card.current{border-color:var(--accent);box-shadow:0 0 0 1px rgba(255,107,53,.15),0 16px 35px rgba(0,0,0,.25)}
+    .tag{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--accent2);margin-bottom:7px}
+    .ex-title{font-size:22px;font-weight:800;margin:0 0 4px}
+    .meta{color:var(--muted);font-size:14px;margin-bottom:12px}
+    .instructions{background:#111115;border-radius:14px;padding:12px;font-size:14px;line-height:1.4;margin-bottom:12px}
+    .sets{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0}
+    .set{
+      min-height:52px;border:1px solid var(--line);background:#202027;border-radius:14px;
+      display:flex;flex-direction:column;align-items:center;justify-content:center;padding:7px 4px;
+      user-select:none;-webkit-user-select:none
+    }
+    .set.done{background:#173a27;border-color:#265c3d;color:#b9ffd2}
+    .set .n{font-weight:800}
+    .set .r{font-size:11px;color:var(--muted);margin-top:3px}
+    .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .row input{
+      flex:1;min-width:120px;background:#101014;color:var(--text);border:1px solid var(--line);
+      border-radius:12px;padding:11px 12px;font-size:16px
+    }
+    .nav{display:flex;gap:10px;margin-top:12px}
+    .nav button{flex:1}
+    .summary{margin:14px 0 6px;color:var(--muted);font-size:13px}
+    details{margin-top:8px}
+    summary{cursor:pointer;color:var(--muted);font-size:13px}
+    .footerbar{
+      position:fixed;left:0;right:0;bottom:0;padding:10px 14px calc(10px + env(safe-area-inset-bottom));
+      background:rgba(13,13,15,.92);backdrop-filter:blur(14px);border-top:1px solid var(--line);z-index:10
+    }
+    .footerbar .inner{max-width:680px;margin:auto;display:flex;gap:10px}
+    .footerbar button{flex:1}
+    .done-all{text-align:center;padding:28px 16px}
+    .done-all h2{font-size:28px;margin-bottom:8px}
+    @media(max-width:420px){
+      .sets{grid-template-columns:repeat(2,1fr)}
+      .timer{align-items:flex-start}
+      .timer-actions{max-width:160px}
+    }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="tag">Séance du soir</div>
+    <h1>Pecs + Dos + Bras</h1>
+    <div class="sub">Objectif : hypertrophie • 4 jours de repos derrière</div>
+    <div class="progress-wrap">
+      <div class="progress-line"><div class="progress" id="progress"></div></div>
+      <div class="progress-text"><span id="progressText"></span><span id="setProgress"></span></div>
+    </div>
+  </header>
+
+  <div class="timer">
+    <div>
+      <small>Repos</small>
+      <strong id="timer">00:00</strong>
+    </div>
+    <div class="timer-actions">
+      <button class="ghost" onclick="adjustTimer(-15)">-15 s</button>
+      <button class="ghost" onclick="adjustTimer(15)">+15 s</button>
+      <button class="primary" onclick="toggleTimer()" id="timerBtn">Démarrer</button>
+    </div>
+  </div>
+
+  <div id="exerciseCard"></div>
+  <div class="summary" id="summary"></div>
+  <div id="allDone" style="display:none" class="card done-all">
+    <h2>Séance terminée</h2>
+    <p>Tu as déroulé toute la séance. Les charges saisies restent mémorisées sur ce téléphone.</p>
+    <button class="primary" onclick="resetSession()">Recommencer la séance</button>
+  </div>
+</div>
+
+<div class="footerbar">
+  <div class="inner">
+    <button class="ghost" onclick="prevExercise()">← Précédent</button>
+    <button class="primary" onclick="nextExercise()">Suivant →</button>
+  </div>
+</div>
+
+<script>
+const exercises = [
+  {
+    group:"PECS", name:"Développé couché barre", sets:4, reps:"5–7", rest:165,
+    cue:"Monte progressivement en charge. Garde 1–2 reps en réserve. Omoplates serrées, trajectoire stable, pas d’échec sur les premières séries."
+  },
+  {
+    group:"PECS", name:"Développé incliné haltères", sets:4, reps:"8–10", rest:120,
+    cue:"Inclinaison modérée. Amplitude contrôlée. Cherche le haut des pecs sans transformer le mouvement en développé épaules."
+  },
+  {
+    group:"PECS", name:"Chest press convergente", sets:3, reps:"10–12", rest:90,
+    cue:"Tension continue. Contrôle la négative. Dernière série possible à 0–1 RIR."
+  },
+  {
+    group:"PECS", name:"Butterfly / Pec deck", sets:3, reps:"12–15", rest:75,
+    cue:"Épaules basses, poitrine sortie. Concentre-toi sur la fermeture des bras et la contraction des pecs. Pas besoin de charger lourd."
+  },
+  {
+    group:"DOS", name:"Tractions ou tirage vertical", sets:4, reps:"6–8", rest:120,
+    cue:"Un seul vrai tirage vertical dans la séance. Pense à tirer les coudes vers les hanches plutôt que les mains vers la poitrine."
+  },
+  {
+    group:"DOS", name:"Rowing barre", sets:4, reps:"6–8", rest:150,
+    cue:"Mouvement lourd mais propre. Tronc gainé, pas de balancier excessif. Cherche l’épaisseur du dos."
+  },
+  {
+    group:"DOS", name:"Machine dos principale", sets:4, reps:"8–12", rest:105,
+    cue:"Ta machine préférée : charge suffisamment lourde, amplitude complète et retour contrôlé. Elle remplace le 2e tirage vertical."
+  },
+  {
+    group:"DOS", name:"Rowing machine poitrine appuyée", sets:3, reps:"10–12", rest:90,
+    cue:"Poitrine collée au support. Tire avec les coudes, marque une courte contraction en fin de mouvement."
+  },
+  {
+    group:"SUPERSET", name:"Chest press + machine dos", sets:3, reps:"12–15 + 12–15", rest:75,
+    cue:"Enchaîne les deux sans repos. Puis 75 s. Ici, priorité au pump et à la congestion, pas à la charge maximale."
+  },
+  {
+    group:"BRAS", name:"Curl incliné + triceps corde", sets:3, reps:"8–12 + 10–15", rest:60,
+    cue:"Superset. Exécution propre, amplitude complète. Repos seulement après les deux mouvements."
+  },
+  {
+    group:"BRAS", name:"Curl marteau + extension triceps au-dessus de la tête", sets:3, reps:"10–12 + 10–15", rest:60,
+    cue:"Dernier bloc. Tu peux pousser la dernière série proche de l’échec si la technique reste propre."
+  }
+];
+
+let state = JSON.parse(localStorage.getItem("seancePecsDosState") || "null") || {
+  current:0, done: exercises.map(e => Array(e.sets).fill(false)), weights:{}
+};
+
+let timerRemaining = 0;
+let timerInterval = null;
+let wakeLock = null;
+
+function save(){ localStorage.setItem("seancePecsDosState", JSON.stringify(state)); }
+
+function fmt(sec){
+  sec = Math.max(0, Math.round(sec));
+  return String(Math.floor(sec/60)).padStart(2,"0")+":"+String(sec%60).padStart(2,"0");
+}
+function renderTimer(){ document.getElementById("timer").textContent = fmt(timerRemaining); }
+
+function beep(){
+  try{
+    const ctx = new (window.AudioContext||window.webkitAudioContext)();
+    const osc = ctx.createOscillator(), gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.frequency.value = 880; gain.gain.value = 0.08;
+    osc.start(); setTimeout(()=>{osc.stop();ctx.close();}, 350);
+  }catch(e){}
+  if(navigator.vibrate) navigator.vibrate([180,100,180]);
+}
+
+function startTimer(seconds){
+  clearInterval(timerInterval);
+  timerRemaining = seconds;
+  renderTimer();
+  document.getElementById("timerBtn").textContent = "Pause";
+  timerInterval = setInterval(()=>{
+    timerRemaining--;
+    renderTimer();
+    if(timerRemaining <= 0){
+      clearInterval(timerInterval); timerInterval = null;
+      document.getElementById("timerBtn").textContent = "Démarrer";
+      beep();
+    }
+  },1000);
+}
+
+function toggleTimer(){
+  if(timerInterval){
+    clearInterval(timerInterval); timerInterval=null;
+    document.getElementById("timerBtn").textContent="Reprendre";
+  } else {
+    if(timerRemaining<=0) timerRemaining = exercises[state.current]?.rest || 60;
+    startTimer(timerRemaining);
+  }
+}
+function adjustTimer(delta){ timerRemaining=Math.max(0,timerRemaining+delta);renderTimer(); }
+
+function toggleSet(i){
+  state.done[state.current][i] = !state.done[state.current][i];
+  save();
+  render();
+  if(state.done[state.current][i]){
+    startTimer(exercises[state.current].rest);
+  }
+}
+
+function nextExercise(){
+  if(state.current < exercises.length-1){
+    state.current++;
+    timerRemaining=0; clearInterval(timerInterval); timerInterval=null; renderTimer();
+    save(); render(); window.scrollTo({top:0,behavior:"smooth"});
+  } else {
+    document.getElementById("exerciseCard").style.display="none";
+    document.getElementById("allDone").style.display="block";
+  }
+}
+function prevExercise(){
+  if(state.current>0){
+    state.current--;
+    timerRemaining=0; clearInterval(timerInterval); timerInterval=null; renderTimer();
+    save(); render(); window.scrollTo({top:0,behavior:"smooth"});
+  }
+}
+function setWeight(v){
+  state.weights[state.current]=v;
+  save();
+}
+function resetSession(){
+  state={current:0,done:exercises.map(e=>Array(e.sets).fill(false)),weights:state.weights||{}};
+  save();
+  document.getElementById("exerciseCard").style.display="block";
+  document.getElementById("allDone").style.display="none";
+  render();
+}
+
+function render(){
+  const e=exercises[state.current];
+  const doneSets=state.done.flat().filter(Boolean).length;
+  const totalSets=exercises.reduce((n,x)=>n+x.sets,0);
+  const doneExercises=state.done.filter(arr=>arr.every(Boolean)).length;
+  document.getElementById("progress").style.width=((doneSets/totalSets)*100)+"%";
+  document.getElementById("progressText").textContent=`Bloc ${state.current+1} / ${exercises.length}`;
+  document.getElementById("setProgress").textContent=`${doneSets} / ${totalSets} séries`;
+  document.getElementById("summary").textContent=`${exercises.length} blocs • 14 exercices réels • ${totalSets} séries prévues • ${doneExercises} blocs terminés`;
+
+  let setsHTML = "";
+  for(let i=0;i<e.sets;i++){
+    setsHTML += `<div class="set ${state.done[state.current][i]?'done':''}" onclick="toggleSet(${i})">
+      <div class="n">Série ${i+1}</div><div class="r">${e.reps} reps</div>
+    </div>`;
+  }
+  document.getElementById("exerciseCard").innerHTML = `
+    <div class="card current">
+      <div class="tag">${e.group}</div>
+      <div class="ex-title">${e.name}</div>
+      <div class="meta">${e.sets} séries • ${e.reps} reps • repos ${fmt(e.rest)}</div>
+      <div class="instructions">${e.cue}</div>
+      <div class="sets">${setsHTML}</div>
+      <div class="row">
+        <input type="text" inputmode="decimal" placeholder="Charge / réglage (ex. 80 kg ou siège 4)"
+          value="${state.weights[state.current]||''}" oninput="setWeight(this.value)" />
+        <button class="ghost" onclick="startTimer(${e.rest})">Repos ${fmt(e.rest)}</button>
+      </div>
+      <details>
+        <summary>Astuce</summary>
+        <div class="instructions" style="margin-top:8px;margin-bottom:0">Appuie sur une série quand elle est faite : le chrono de repos démarre automatiquement. Les charges restent enregistrées sur ce téléphone.</div>
+      </details>
+    </div>`;
+}
+
+async function enableWakeLock(){
+  try{
+    if('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen');
+  }catch(e){}
+}
+document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible") enableWakeLock(); });
+enableWakeLock();
+render();
+renderTimer();
+</script>
+<script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => navigator.serviceWorker.register("./service-worker.js").catch(()=>{}));
+}
+</script>
+</body>
+</html>
