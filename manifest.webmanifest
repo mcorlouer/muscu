@@ -1,11 +1,11 @@
 {
-  "name":"Séance Pecs Dos",
-  "short_name":"Pecs Dos",
+  "name":"Workout Maxence",
+  "short_name":"Workout",
   "start_url":"./",
   "display":"standalone",
-  "background_color":"#0d0d0f",
-  "theme_color":"#111111",
-  "description":"Séance mobile pecs, dos et bras avec charges par série, chrono et consignes.",
+  "background_color":"#0b0b0d",
+  "theme_color":"#0b0b0d",
+  "description":"Séance guidée Pecs Dos Bras pour Maxence.",
   "icons":[
     {"src":"icon-192.png","sizes":"192x192","type":"image/png"},
     {"src":"icon-512.png","sizes":"512x512","type":"image/png"}
