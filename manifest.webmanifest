@@ -1,12 +1,12 @@
 {
-  "name": "Séance Pecs Dos",
-  "short_name": "Pecs Dos",
-  "start_url": "./",
-  "display": "standalone",
-  "background_color": "#0d0d0f",
-  "theme_color": "#111111",
-  "description": "Séance mobile pecs, dos et bras avec séries, repos et consignes.",
-  "icons": [
+  "name":"Séance Pecs Dos",
+  "short_name":"Pecs Dos",
+  "start_url":"./",
+  "display":"standalone",
+  "background_color":"#0d0d0f",
+  "theme_color":"#111111",
+  "description":"Séance mobile pecs, dos et bras avec charges par série, chrono et consignes.",
+  "icons":[
     {"src":"icon-192.png","sizes":"192x192","type":"image/png"},
     {"src":"icon-512.png","sizes":"512x512","type":"image/png"}
   ]
