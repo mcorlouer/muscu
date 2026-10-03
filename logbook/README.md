@@ -31,8 +31,10 @@ Après une modification de `Code.gs` : Déployer > Gérer les déploiements > mo
 ### 3. Sur l'iPhone
 1. Ouvrir l'adresse dans Safari, Partager > Sur l'écran d'accueil.
 2. Ouvrir l'app depuis l'icône. Réglages : coller l'URL `/exec`, le mot de passe, Enregistrer et tester.
-3. Importer le programme : choisir `programme.json` ou coller son contenu.
-4. Si des séries ont été notées à la main, les reporter dans Réglages > Saisie manuelle.
+3. Charger le programme : choisir le fichier `programme.json` (envoyé par AirDrop ou iCloud Drive).
+4. Si des séries ont été notées à la main, les reporter dans Réglages > Ajouter une série oubliée.
+
+Pour effacer des données de test : Réglages > Repartir de zéro (efface le Sheet et l'app, garde le programme).
 
 ## Mettre à jour l'app
 

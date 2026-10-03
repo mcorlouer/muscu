@@ -47,6 +47,7 @@ function doPost(e) {
       case 'addSerie': return out(append('Series', d));
       case 'addSeance': return out(append('Seances', d));
       case 'addModification': return out(append('Modifications', d));
+      case 'reset': return out(resetData());
       default: return out({ ok: false, error: 'Action inconnue : ' + req.action });
     }
   } catch (err) {
@@ -131,6 +132,20 @@ function append(name, obj) {
       return v === undefined || v === null ? '' : v;
     });
     sh.appendRow(row);
+    return { ok: true };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function resetData() {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    ['Series', 'Seances', 'Modifications'].forEach(function (name) {
+      const sh = sheet(name);
+      if (sh.getLastRow() > 1) sh.deleteRows(2, sh.getLastRow() - 1);
+    });
     return { ok: true };
   } finally {
     lock.releaseLock();
