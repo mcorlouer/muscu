@@ -161,7 +161,7 @@ nav button.on{color:var(--ink);box-shadow:inset 0 3px 0 var(--acc)}
 .phases em{font-style:normal;font-weight:600;font-size:14px}
 .phases p{font-size:13px;color:var(--muted);margin:4px 0 0}
 .week{padding:12px 0;border-bottom:1px solid var(--line)}
-.week .wh{display:flex;justify-content:space-between;align-items:baseline}
+.week .wh{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:2px 10px}
 .week .wh b{font:700 22px var(--num)}
 .week .ph{font:600 16px var(--num)}
 .chips{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px}
@@ -219,7 +219,7 @@ summary{font:600 21px var(--num);cursor:pointer}
 <div id="toast"></div>
 <script>
 'use strict';
-const APP_VERSION = '2';
+const APP_VERSION = '3';
 
 /* ---------- Utilitaires ---------- */
 const LS = {
@@ -735,7 +735,7 @@ function renderCycle() {
   const weeks = P.semaines.map(w => {
     const ss = pl.filter(s => s.week === w.numero);
     const key = w.decharge ? 'decharge' : w.phase;
-    return `<div class="week"><div class="wh"><b>Semaine ${w.numero}</b><span class="ph" style="color:${PHASE_COL[key]}">${w.decharge ? 'Décharge' : PHASES[w.phase]}${!w.decharge && w.reps_en_reserve != null ? `, ${w.reps_en_reserve === 0 ? 'échec' : w.reps_en_reserve + ' en réserve'}` : ''}</span></div>
+    return `<div class="week"><div class="wh"><b>Semaine ${w.numero}${w.debut ? `<small style="font-weight:400;opacity:.6;margin-left:8px;white-space:nowrap">${(() => { const a = parseISO(w.debut), z = parseISO(w.debut); z.setDate(z.getDate() + 6); return a.getDate() + (a.getMonth() !== z.getMonth() ? ' ' + MOIS[a.getMonth()] : '') + ' au ' + z.getDate() + ' ' + MOIS[z.getMonth()]; })()}</small>` : ''}</b><span class="ph" style="color:${PHASE_COL[key]}">${w.decharge ? 'Décharge' : PHASES[w.phase]}${!w.decharge && w.reps_en_reserve != null ? `, ${w.reps_en_reserve === 0 ? 'échec' : w.reps_en_reserve + ' en réserve'}` : ''}</span></div>
       <div class="chips">${ss.map(s => { const d = parseISO(s.date); return `<button class="chip ${s.statut || ''} ${s.date === t ? 'today' : ''}" style="--c:${PHASE_COL[key]}" data-a="plan" data-v="${s.i}"><span class="d">${JOURS[d.getDay()].slice(0, 3)}. ${d.getDate()} ${MOIS[d.getMonth()]}</span><b>${esc(P.seances[s.seance].nom)}</b>${s.statut === 'faite' ? 'faite' : s.statut === 'sautee' ? 'sautée' : ''}</button>`; }).join('')}</div></div>`;
   }).join('');
   return `<h1>Cycle</h1><p class="muted">Du ${fmtDate(P.meta.debut, true)} au ${fmtDate(P.meta.fin, true)}, lundi, mercredi, jeudi et samedi.</p>
@@ -1010,7 +1010,7 @@ const ACT = {
     const date = document.getElementById('m-date').value, id = document.getElementById('m-ex').value;
     const kg = parseFloat(document.getElementById('m-kg').value), reps = parseInt(document.getElementById('m-reps').value, 10);
     if (!date || !id || isNaN(kg) || isNaN(reps)) { toast('Série incomplète', 'Renseignez la date, la charge et les reps.'); return; }
-    const wk = Math.min(P.semaines.length, Math.max(1, Math.floor((parseISO(date) - parseISO(P.meta.debut)) / 864e5 / 7) + 1));
+    const wk = Math.max(1, P.semaines.filter(x => x.debut <= date).length);
     const w = P.semaines[wk - 1];
     const prev = H.series.filter(r => r.exercice_id === id && r.date === date && r.type === 'normale').length;
     const r = { id: uid(), horodatage: Date.now(), date, index_seance: null, semaine: wk, phase: w.phase, seance: '', ordre: null, exercice_id: id, exercice_prevu_id: id,
