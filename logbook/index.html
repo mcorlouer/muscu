@@ -80,7 +80,8 @@ nav button.on{color:var(--ink);box-shadow:inset 0 3px 0 var(--acc)}
 .plan li.cur{box-shadow:inset 4px 0 0 var(--acc);padding-left:12px}
 
 /* Séance en cours : tout tient en hauteur */
-.act{display:flex;flex-direction:column;height:calc(100dvh - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px) - 16px);gap:min(1.3vh,12px)}
+.act{display:flex;flex-direction:column;height:calc(100dvh - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px) - 16px);gap:min(1.3vh,12px);overflow-y:auto;overflow-x:hidden}
+.act>*{flex-shrink:0}
 .act-top{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .act-top .phase-tag{font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .act-top .links{display:flex;gap:12px;flex:none}
@@ -89,11 +90,11 @@ nav button.on{color:var(--ink);box-shadow:inset 0 3px 0 var(--acc)}
 .progress i.d{background:var(--acc)}
 .progress i.c{background:var(--ink)}
 .exo-name{font:700 clamp(26px,4.3vh,38px)/1.02 var(--num);margin:0}
-.sets{display:flex;align-items:center;gap:8px}
-.sets i{width:clamp(30px,4.6vh,40px);height:clamp(30px,4.6vh,40px);border-radius:50%;display:grid;place-items:center;font:700 clamp(17px,2.5vh,21px) var(--num);font-style:normal;background:var(--surf2);color:var(--muted)}
+.sets{display:flex;align-items:center;gap:8px;padding:5px 4px;--d:min(clamp(28px,4.6vh,40px),calc((100vw - 40px) * .56 / var(--n,4) - 8px))}
+.sets i{flex:none;width:var(--d);height:var(--d);border-radius:50%;display:grid;place-items:center;font:700 calc(var(--d) * .52) var(--num);font-style:normal;background:var(--surf2);color:var(--muted)}
 .sets i.d{background:var(--acc);color:var(--acc-ink)}
-.sets i.c{background:var(--ink);color:var(--bg);transform:scale(1.18);box-shadow:0 0 0 3px var(--acc)}
-.sets b{font:700 clamp(20px,3vh,26px) var(--num);margin-left:8px}
+.sets i.c{background:var(--ink);color:var(--bg);box-shadow:0 0 0 3px var(--acc);margin:0 3px}
+.sets b{font:700 clamp(18px,min(3vh,5.6vw),26px) var(--num);margin-left:auto;padding-left:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .sets b.last{color:var(--acc)}
 .tempo{display:flex;align-items:stretch;gap:10px;background:var(--surf);border-radius:12px;padding:8px 10px}
 .tempo .tn{flex:1;display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
@@ -107,10 +108,10 @@ nav button.on{color:var(--ink);box-shadow:inset 0 3px 0 var(--acc)}
 .tempo .tt{font:600 15px var(--num);color:var(--muted);writing-mode:vertical-rl;transform:rotate(180deg);text-align:center}
 .info{font-size:14px;color:var(--muted);line-height:1.35}
 .info b{color:var(--ink);font-weight:600}
-.inputs{display:grid;grid-template-columns:1fr 1fr;gap:12px;flex:1;min-height:0}
-.box{background:var(--surf);border-radius:14px;padding:8px;display:flex;flex-direction:column;justify-content:space-between}
+.inputs{display:grid;grid-template-columns:1fr 1fr;gap:12px;flex:1 0 auto}
+.box{background:var(--surf);border-radius:14px;padding:8px;display:flex;flex-direction:column;justify-content:space-between;gap:6px}
 .box label{font:600 16px var(--num);color:var(--muted);text-align:center}
-.box .v{font:700 clamp(46px,8.5vh,84px)/1 var(--num);text-align:center;width:100%;letter-spacing:-1px}
+.box .v{font:700 clamp(40px,7.5vh,84px)/1 var(--num);text-align:center;width:100%;letter-spacing:-1px}
 .box .v small{font-size:.38em;color:var(--muted);letter-spacing:0;margin-left:2px}
 .box .g{display:grid;grid-template-columns:1fr 1fr;gap:6px}
 .box .g button{background:var(--surf2);border-radius:10px;height:clamp(40px,5.6vh,52px);font:700 clamp(20px,2.8vh,26px) var(--num)}
@@ -124,6 +125,16 @@ nav button.on{color:var(--ink);box-shadow:inset 0 3px 0 var(--acc)}
 .next.hot{background:var(--acc);color:var(--acc-ink)}
 .next.hot .muted{color:inherit;opacity:.8}
 .act-links{display:flex;justify-content:space-between}
+@media (max-height:740px){
+.act{gap:7px}
+.exo-name{font-size:clamp(22px,3.9vh,30px)}
+.tempo{padding:4px 8px}.tempo .tn b{font-size:21px}.tempo .tn span{font-size:11px}
+.info{font-size:13px;line-height:1.25}
+.box{padding:6px}.box label{font-size:14px}.box .g button{height:36px;font-size:19px}
+.rpe input{height:22px}.rpe .rv{font-size:20px}
+.validate{padding:11px;font-size:24px}
+.next{padding:6px 10px;font-size:13px;line-height:1.25}.next b{font-size:16px}
+}
 
 /* Chrono plein écran */
 .timer{flex:1;display:flex;flex-direction:column;justify-content:center;text-align:center;gap:12px}
@@ -148,6 +159,7 @@ nav button.on{color:var(--ink);box-shadow:inset 0 3px 0 var(--acc)}
 .opts{display:flex;flex-direction:column;gap:10px;margin-top:16px}
 .opt{text-align:left;background:var(--surf2);border-radius:12px;padding:14px 16px;font-weight:600}
 .opt small{display:block;font-weight:400;color:var(--muted)}
+.opt.sel{box-shadow:inset 0 0 0 2px var(--acc)}
 
 /* Cycle */
 .timeline{display:flex;align-items:flex-end;gap:4px;height:110px;margin:14px 0 4px}
@@ -219,7 +231,7 @@ summary{font:600 21px var(--num);cursor:pointer}
 <div id="toast"></div>
 <script>
 'use strict';
-const APP_VERSION = '3';
+const APP_VERSION = '4';
 
 /* ---------- Utilitaires ---------- */
 const LS = {
@@ -293,6 +305,7 @@ async function refresh() {
       if (list && !list.find(x => x.id === q.data.id)) list.push(q.data);
     }
     saveH();
+    if (modal && modal.type === 'missed') { const m = firstMissed(); if (m) modal.i = m.i; else modal = null; }
     net = { ok: true, msg: '', tested: true };
   } catch (e) { net = { ok: false, msg: e.message }; }
   if (!(A && A.timer)) render();
@@ -333,10 +346,27 @@ function plan() {
     const shift = ev.filter(e => e <= s.i).length;
     const rows = H.seances.filter(r => r.index_seance === s.i);
     const statut = rows.some(r => r.statut === 'faite') ? 'faite' : rows.some(r => r.statut === 'sautee') ? 'sautee' : null;
-    return { ...s, date: sl[s.i + shift], statut };
+    const mv = rows.filter(r => r.statut === 'deplacee' && r.date_reelle).sort((a, b) => a.horodatage - b.horodatage).pop();
+    const dateSlot = sl[s.i + shift];
+    const date = mv ? String(mv.date_reelle).slice(0, 10) : dateSlot;
+    return { ...s, date, dateSlot, deplacee: !!mv && date !== dateSlot, statut };
   });
 }
-const nextSession = () => plan().find(s => !s.statut) || null;
+const nextSession = () => plan().filter(s => !s.statut).sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : a.i - b.i)[0] || null;
+/* Jours possibles pour déplacer une séance : d'aujourd'hui (ou du lundi) jusqu'au dimanche de sa semaine */
+function moveDays(s) {
+  const w = P.semaines[s.week - 1], t = todayISO();
+  const mon = parseISO(w && w.debut ? w.debut : s.dateSlot);
+  const out = [];
+  for (let k = 0; k < 7; k++) { const d = new Date(mon); d.setDate(d.getDate() + k); const x = iso(d); if (x >= t) out.push(x); }
+  if (!out.length) out.push(t);
+  return out;
+}
+function moveSession(i, date) {
+  const s = plan()[i];
+  const row = { id: uid(), horodatage: Date.now(), index_seance: s.i, seance: s.seance, date_prevue: s.dateSlot, statut: 'deplacee', date_reelle: date };
+  H.seances.push(row); saveH(); enqueue('addSeance', row);
+}
 function firstMissed() {
   const s = nextSession();
   if (!s || (A && A.i === s.i)) return null;
@@ -623,7 +653,8 @@ function renderToday() {
     <p class="muted">${when}${s.decharge ? ', semaine allégée' : s.rir === 0 ? ', dernière série à l’échec' : s.rir != null ? `, arrêter ${s.rir} rep${s.rir > 1 ? 's' : ''} avant l’échec` : ''}</p>
     <div class="stripe"></div>
     ${planList(s, false)}
-    <div style="margin-top:22px">${isToday ? `<button class="btn" data-a="start">Démarrer la séance</button>` : `<button class="btn ghost" data-a="start">Commencer maintenant</button>`}</div>`;
+    <div style="margin-top:22px">${isToday ? `<button class="btn" data-a="start">Démarrer la séance</button>` : `<button class="btn ghost" data-a="start">Commencer maintenant</button>`}</div>
+    <div style="margin-top:14px;text-align:center"><button class="link" data-a="move-ask" data-v="${s.i}">Changer de jour</button></div>`;
 }
 
 /* Séance en cours */
@@ -698,7 +729,7 @@ function renderActive() {
     : `<button class="link" data-a="sets" data-v="1">+ série</button><button class="link" data-a="sets" data-v="-1">− série</button><button class="link" data-a="replace">Remplacer</button><button class="link" data-a="stop">Arrêter</button>`;
   return `<div class="act">${top}
     <h1 class="exo-name">${esc(ex.nom)}</h1>
-    <div class="sets">${setLine}</div>
+    <div class="sets" style="--n:${Math.max(it.setsPlanned, 4)}">${setLine}</div>
     ${renderTempo(p.tempo)}
     <div class="info">${info}</div>
     ${inputs}
@@ -733,10 +764,10 @@ function renderCycle() {
   const bars = P.semaines.map(w => `<div class="${w.numero === curW ? 'now' : ''}" style="height:${Math.round(weekEffort(w) * 100)}%;background:${PHASE_COL[w.decharge ? 'decharge' : w.phase]}"></div>`).join('');
   const phases = ['hypertrophie', 'force', 'hypertrophie_intensifiee', 'decharge'].map(k => `<div style="--c:${PHASE_COL[k]}"><b>${k === 'decharge' ? 'Décharge' : PHASES[k]}</b><em>${PHASE_INFO[k][0]}</em><p>${PHASE_INFO[k][1]}</p></div>`).join('');
   const weeks = P.semaines.map(w => {
-    const ss = pl.filter(s => s.week === w.numero);
+    const ss = pl.filter(s => s.week === w.numero).sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : a.i - b.i);
     const key = w.decharge ? 'decharge' : w.phase;
     return `<div class="week"><div class="wh"><b>Semaine ${w.numero}${w.debut ? `<small style="font-weight:400;opacity:.6;margin-left:8px;white-space:nowrap">${(() => { const a = parseISO(w.debut), z = parseISO(w.debut); z.setDate(z.getDate() + 6); return a.getDate() + (a.getMonth() !== z.getMonth() ? ' ' + MOIS[a.getMonth()] : '') + ' au ' + z.getDate() + ' ' + MOIS[z.getMonth()]; })()}</small>` : ''}</b><span class="ph" style="color:${PHASE_COL[key]}">${w.decharge ? 'Décharge' : PHASES[w.phase]}${!w.decharge && w.reps_en_reserve != null ? `, ${w.reps_en_reserve === 0 ? 'échec' : w.reps_en_reserve + ' en réserve'}` : ''}</span></div>
-      <div class="chips">${ss.map(s => { const d = parseISO(s.date); return `<button class="chip ${s.statut || ''} ${s.date === t ? 'today' : ''}" style="--c:${PHASE_COL[key]}" data-a="plan" data-v="${s.i}"><span class="d">${JOURS[d.getDay()].slice(0, 3)}. ${d.getDate()} ${MOIS[d.getMonth()]}</span><b>${esc(P.seances[s.seance].nom)}</b>${s.statut === 'faite' ? 'faite' : s.statut === 'sautee' ? 'sautée' : ''}</button>`; }).join('')}</div></div>`;
+      <div class="chips">${ss.map(s => { const d = parseISO(s.date); return `<button class="chip ${s.statut || ''} ${s.date === t ? 'today' : ''}" style="--c:${PHASE_COL[key]}" data-a="plan" data-v="${s.i}"><span class="d">${JOURS[d.getDay()].slice(0, 3)}. ${d.getDate()} ${MOIS[d.getMonth()]}</span><b>${esc(P.seances[s.seance].nom)}</b>${s.statut === 'faite' ? 'faite' : s.statut === 'sautee' ? 'sautée' : s.deplacee ? 'déplacée' : ''}</button>`; }).join('')}</div></div>`;
   }).join('');
   return `<h1>Cycle</h1><p class="muted">Du ${fmtDate(P.meta.debut, true)} au ${fmtDate(P.meta.fin, true)}, lundi, mercredi, jeudi et samedi.</p>
     <h2>Intensité semaine par semaine</h2>
@@ -819,7 +850,7 @@ function renderSub() {
   if (sub.type === 'exo') return renderExo(sub.id);
   if (sub.type === 'plan') {
     const s = plan()[sub.i];
-    return `<button class="link" data-a="back">Retour</button><span class="phase-tag" style="display:block;color:${PHASE_COL[phaseKey(s)]}">Semaine ${s.week}, ${phaseLabel(s).toLowerCase()}</span><h1>${esc(P.seances[s.seance].nom)}</h1><p class="muted">${fmtDate(s.date, true)}${s.statut ? ', ' + (s.statut === 'faite' ? 'faite' : 'sautée') : ''}</p><div class="stripe" style="background:${PHASE_COL[phaseKey(s)]}"></div>${planList(s, false)}`;
+    return `<button class="link" data-a="back">Retour</button><span class="phase-tag" style="display:block;color:${PHASE_COL[phaseKey(s)]}">Semaine ${s.week}, ${phaseLabel(s).toLowerCase()}</span><h1>${esc(P.seances[s.seance].nom)}</h1><p class="muted">${fmtDate(s.date, true)}${s.deplacee ? ` (prévue ${fmtDate(s.dateSlot, true)})` : ''}${s.statut ? ', ' + (s.statut === 'faite' ? 'faite' : 'sautée') : ''}</p>${!s.statut && !(A && A.i === s.i) ? `<div style="margin:8px 0 14px"><button class="btn small ghost" data-a="move-ask" data-v="${s.i}">Changer de jour</button></div>` : ''}<div class="stripe" style="background:${PHASE_COL[phaseKey(s)]}"></div>${planList(s, false)}`;
   }
   return '';
 }
@@ -886,9 +917,20 @@ function renderModal() {
   if (modal.type === 'missed') {
     const s = plan()[modal.i];
     inner = `<h3>Séance non faite</h3><p>${esc(P.seances[s.seance].nom)}, prévue ${fmtDate(s.date, true)}.</p>
-      <div class="opts"><button class="opt" data-a="missed" data-v="decalee">Décaler<small>Elle devient la prochaine séance, tout le planning glisse d’un créneau.</small></button>
+      <div class="opts"><button class="opt" data-a="move-ask" data-v="${s.i}">La faire un autre jour<small>Tu choisis le jour, le reste du planning ne bouge pas.</small></button>
+      <button class="opt" data-a="missed" data-v="decalee">Tout décaler<small>Elle devient la prochaine séance, tout le planning glisse d’un créneau.</small></button>
       <button class="opt" data-a="missed" data-v="sautee">Sauter<small>Elle est abandonnée, le planning ne bouge pas.</small></button>
       <button class="opt" data-a="modal-close">Plus tard</button></div>`;
+  } else if (modal.type === 'move') {
+    const pl = plan(), s = pl[modal.i], t = todayISO();
+    const days = moveDays(s).map(d => {
+      const autres = pl.filter(o => o.i !== s.i && o.date === d && o.statut !== 'sautee').map(o => P.seances[o.seance].nom + (o.statut === 'faite' ? ' (faite)' : ''));
+      const lbl = (d === t ? 'Aujourd’hui, ' : '') + fmtDate(d, true);
+      const note = [d === s.dateSlot ? 'jour prévu au programme' : '', autres.length ? 'déjà : ' + autres.join(', ') : ''].filter(Boolean).join(' · ');
+      return `<button class="opt${d === s.date ? ' sel' : ''}" data-a="move-pick" data-v="${d}">${lbl}${d === s.date ? ' ✓' : ''}${note ? `<small>${esc(note)}</small>` : ''}</button>`;
+    }).join('');
+    inner = `<h3>Changer de jour</h3><p class="muted">${esc(P.seances[s.seance].nom)}, semaine ${s.week}. Les autres séances restent à leur place.</p>
+      <div class="opts">${days}<button class="opt" data-a="modal-close">Annuler</button></div>`;
   } else if (modal.type === 'overview') {
     inner = `<h3>Toute la séance</h3>${planList(curS(), true)}<div class="opts"><button class="opt" data-a="modal-close">Fermer</button></div>`;
   } else if (modal.type === 'replace') {
@@ -922,6 +964,12 @@ const ACT = {
   overview() { modal = { type: 'overview' }; render(); },
   'modal-close'() { if (modal && modal.type === 'missed') missedDismissed = true; modal = null; render(); },
   'modal-bg'(d, el, ev) { if (ev.target === el) ACT['modal-close'](); },
+  'move-ask'(d) { modal = { type: 'move', i: +d.v }; render(); },
+  'move-pick'(d) {
+    const s = plan()[modal.i];
+    if (d.v !== s.date) { moveSession(modal.i, d.v); toast('Séance déplacée', `${P.seances[s.seance].nom} : ${fmtDate(d.v, true)}`); }
+    modal = null; missedDismissed = false; render();
+  },
   missed(d) {
     const s = plan()[modal.i];
     const row = { id: uid(), horodatage: Date.now(), index_seance: s.i, seance: s.seance, date_prevue: s.date, statut: d.v, date_reelle: '' };
