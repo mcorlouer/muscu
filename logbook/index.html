@@ -231,7 +231,7 @@ summary{font:600 21px var(--num);cursor:pointer}
 <div id="toast"></div>
 <script>
 'use strict';
-const APP_VERSION = '4';
+const APP_VERSION = '5';
 
 /* ---------- Utilitaires ---------- */
 const LS = {
@@ -382,6 +382,17 @@ function presc(s, def) {
   const p = { ...def.prescriptions[s.phase] };
   if (s.decharge) { p.series = Math.ceil(p.series / 2); delete p.technique_derniere_serie; }
   return p;
+}
+function activeReplacements() {
+  if (!P) return [];
+  const out = [];
+  Object.entries(P.seances).forEach(([sid, se]) => se.exercices.forEach(def => {
+    if (def.choix && def.choix.length > 1) return;
+    const mods = H.modifications.filter(m => m.seance === sid && m.ordre === def.ordre).sort((a, b) => a.horodatage - b.horodatage);
+    const last = mods[mods.length - 1];
+    if (last && last.exercice_remplacant !== def.exercice) out.push({ sid, ordre: def.ordre, initial: def.exercice, rempl: last.exercice_remplacant });
+  }));
+  return out;
 }
 function resolveEx(s, def) {
   const mods = H.modifications.filter(m => m.seance === s.seance && m.ordre === def.ordre && m.a_partir_de_semaine <= s.week).sort((a, b) => a.horodatage - b.horodatage);
@@ -899,6 +910,7 @@ function renderSettings() {
       <p class="muted small">Choisissez le fichier programme.json (envoyez-le-vous par AirDrop ou iCloud Drive). À refaire seulement si on change de programme.</p>
       <label for="p-file">Fichier</label><input id="p-file" type="file" accept="application/json,.json">
       <div style="margin-top:12px"><button class="btn small ghost" data-a="prog-import">Charger le programme</button></div></div>
+    ${activeReplacements().length ? `<div class="step"><h2>Remplacements permanents</h2><p class="muted small">Exercices remplacés « pour les prochaines séances ».</p><div class="opts">${activeReplacements().map(r => `<button class="opt" data-a="rep-undo" data-s="${r.sid}" data-o="${r.ordre}">${esc(P.seances[r.sid].nom)} : ${esc(EX(r.rempl).nom)}<small>à la place de ${esc(EX(r.initial).nom)}. Toucher pour revenir à l’original.</small></button>`).join('')}</div></div>` : ''}
     <div class="step"><h2>Vos données</h2>
       <p class="muted small">${H.series.length} série(s) enregistrée(s)${Q.length ? `, ${Q.length} en attente d’envoi` : ''}.</p>
       <div class="opts"><button class="opt" data-a="sync">Recharger depuis le Sheet<small>Si vous avez corrigé des lignes directement dans Google Sheets.</small></button>
@@ -935,7 +947,7 @@ function renderModal() {
     inner = `<h3>Toute la séance</h3>${planList(curS(), true)}<div class="opts"><button class="opt" data-a="modal-close">Fermer</button></div>`;
   } else if (modal.type === 'replace') {
     const it = curIt(), def = curDef(), base = EX(def.exercice), cur = EX(it.exId);
-    const ids = [...new Set([...(def.choix || []), ...(base.alternatives || []), ...(cur.alternatives || []), ...Object.values(P.exercices).filter(e => e.groupe === cur.groupe).map(e => e.id)])].filter(id => id !== it.exId);
+    const ids = [...new Set([...(def.choix || []), ...(base.alternatives || []), ...(cur.alternatives || []), ...Object.values(P.exercices).filter(e => e.groupe === cur.groupe).map(e => e.id)])].filter(id => id !== it.exId && !A.items.some((o, k) => k !== A.cur.item && o.exId === id));
     inner = `<h3>Remplacer ${esc(cur.nom)}</h3><div class="opts">${ids.map(id => `<button class="opt" data-a="rep-pick" data-v="${id}">${esc(EX(id).nom)}</button>`).join('')}<button class="opt" data-a="modal-close">Annuler</button></div>`;
   } else if (modal.type === 'replace-scope') {
     inner = `<h3>${esc(EX(modal.id).nom)}</h3><p class="muted">Pour combien de temps ?</p><div class="opts">
@@ -1013,6 +1025,13 @@ const ACT = {
       H.modifications.push(row); saveH(); enqueue('addModification', row);
     }
     it.exId = id; A.draft = null; makeDraft(); modal = null; saveA(); render();
+  },
+  'rep-undo'(d) {
+    const def = P.seances[d.s].exercices.find(e => e.ordre === +d.o); const ns = nextSession();
+    const cur = activeReplacements().find(r => r.sid === d.s && r.ordre === +d.o);
+    const row = { id: uid(), horodatage: Date.now(), seance: d.s, ordre: def.ordre, exercice_initial: cur ? cur.rempl : '', exercice_remplacant: def.exercice, a_partir_de_semaine: ns ? ns.week : 1 };
+    H.modifications.push(row); saveH(); enqueue('addModification', row);
+    toast('Exercice rétabli', EX(def.exercice).nom); render();
   },
   stop() { modal = { type: 'stop' }; render(); },
   'stop-ok'() { modal = null; if (A.items.some(it => it.sets.length)) finishSession(); else closeSession(); },
