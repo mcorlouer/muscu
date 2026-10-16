@@ -83,7 +83,9 @@ nav button.on{color:var(--ink);box-shadow:inset 0 3px 0 var(--acc)}
 .act{display:flex;flex-direction:column;height:calc(100dvh - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px) - 16px);gap:min(1.3vh,12px);overflow-y:auto;overflow-x:hidden}
 .act>*{flex-shrink:0}
 .act-top{display:flex;justify-content:space-between;align-items:center;gap:8px}
-.act-top .phase-tag{font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.act-top .phase-tag{font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.eta{font-size:13px;color:var(--muted);white-space:nowrap;flex:none;margin-right:auto;padding-left:2px}
+.chip .du{display:block;font-size:12px;opacity:.7;font-weight:400}
 .act-top .links{display:flex;gap:12px;flex:none}
 .progress{display:flex;gap:3px}
 .progress i{flex:1;height:5px;border-radius:2px;background:var(--surf2)}
@@ -135,6 +137,12 @@ nav button.on{color:var(--ink);box-shadow:inset 0 3px 0 var(--acc)}
 .validate{padding:11px;font-size:24px}
 .next{padding:6px 10px;font-size:13px;line-height:1.25}.next b{font-size:16px}
 }
+@media (max-height:820px){
+.note{padding:5px 9px;font-size:14px;line-height:1.25}
+.addnote{font-size:13px}
+.rpe{margin:-4px 0}
+.act{gap:min(1.1vh,10px)}
+}
 
 /* Chrono plein écran */
 .timer{flex:1;display:flex;flex-direction:column;justify-content:center;text-align:center;gap:12px}
@@ -183,6 +191,13 @@ nav button.on{color:var(--ink);box-shadow:inset 0 3px 0 var(--acc)}
 .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:14px;color:var(--muted);margin-bottom:6px}
 .legend i{display:inline-block;width:16px;height:3px;border-radius:2px;vertical-align:middle;margin-right:6px}
 .tip{min-height:20px;font-size:14px;color:var(--ink);margin-top:4px}
+.note{display:block;width:100%;text-align:left;background:color-mix(in srgb,var(--acc) 16%,var(--surf));border-left:4px solid var(--acc);border-radius:10px;padding:7px 10px;font-size:15px;line-height:1.3;color:var(--ink)}
+.note b{font-weight:700}
+.addnote{font-size:14px;color:var(--muted);text-decoration:underline;text-align:left}
+.pnote{font-size:14px;color:var(--ink);font-style:italic;margin-top:3px}
+.next .nk{font:700 26px var(--num);white-space:nowrap}
+.next .nn{display:block;font-size:14px;font-style:italic;margin-top:3px;opacity:.9}
+textarea{width:100%;min-height:110px;border-radius:12px;border:1px solid var(--line);background:var(--surf);color:var(--ink);font:16px var(--txt);padding:10px}
 .pz{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--line);font-size:16px}
 
 /* Cycle */
@@ -255,7 +270,7 @@ summary{font:600 21px var(--num);cursor:pointer}
 <div id="toast"></div>
 <script>
 'use strict';
-const APP_VERSION = '6';
+const APP_VERSION = '8';
 
 /* ---------- Utilitaires ---------- */
 const LS = {
@@ -291,7 +306,7 @@ const bool = v => v === true || v === 'TRUE' || v === 'true' || v === 1;
 let cfg = LS.get('cfg', { url: '', token: '' });
 let P = LS.get('programme', null);
 let H = LS.get('hist', { series: [], seances: [], modifications: [], poids: [] });
-H.poids = H.poids || [];
+H.poids = H.poids || []; H.notes = H.notes || [];
 let scriptV = LS.get('scriptv', 1);
 let Q = LS.get('queue', []);
 let A = LS.get('active', null);
@@ -329,6 +344,7 @@ function applyOp(q) {
   else if (q.action === 'addModification') { if (!has(H.modifications)) H.modifications.push(d); }
   else if (q.action === 'addPoids') { if (!has(H.poids)) H.poids.push(d); }
   else if (q.action === 'deletePoids') H.poids = H.poids.filter(x => x.id !== d.id);
+  else if (q.action === 'setNote') { H.notes = H.notes.filter(x => x.exercice_id !== d.exercice_id); if (d.texte) H.notes.push(d); }
   else if (q.action === 'updateSerie') { const r = has(H.series); if (r) Object.assign(r, d); }
   else if (q.action === 'deleteSerie') H.series = H.series.filter(x => x.id !== d.id && x.serie_parent_id !== d.id);
 }
@@ -337,7 +353,7 @@ async function refresh() {
   try {
     const j = await api('getAll');
     if (j.programme) { P = j.programme; LS.set('programme', P); seqCache = null; }
-    H = { series: j.series.map(normSerie), seances: j.seances.map(normSeance), modifications: j.modifications.map(normMod), poids: (j.poids || []).map(normPoids) };
+    H = { series: j.series.map(normSerie), seances: j.seances.map(normSeance), modifications: j.modifications.map(normMod), poids: (j.poids || []).map(normPoids), notes: (j.notes || []).map(r => ({ exercice_id: String(r.exercice_id), texte: String(r.texte ?? ''), horodatage: num(r.horodatage) })) };
     scriptV = j.scriptVersion || 1; LS.set('scriptv', scriptV);
     for (const q of Q) applyOp(q);
     saveH();
@@ -504,6 +520,11 @@ function checkPR(id, c, r) {
 
 /* ---------- Corriger une série ---------- */
 const findSet = id => H.series.find(r => r.id === id) || (A ? A.items.flatMap(it => it.sets).find(r => r.id === id) : null);
+function saveNote(exId, texte) {
+  const row = { exercice_id: exId, texte, horodatage: Date.now() };
+  H.notes = (H.notes || []).filter(x => x.exercice_id !== exId); if (texte) H.notes.push(row);
+  saveH(); enqueue('setNote', row);
+}
 function editSet(id, fields) {
   [H.series, ...(A ? A.items.map(it => it.sets) : [])].forEach(l => { const r = l.find(x => x.id === id); if (r) Object.assign(r, fields); });
   saveH(); if (A) saveA(); enqueue('updateSerie', { id, ...fields });
@@ -514,6 +535,73 @@ function deleteSet(id) {
   saveH(); if (A) saveA(); enqueue('deleteSerie', { id });
 }
 const setChip = r => `<span class="sc" data-a="set-open" data-v="${r.id}">${EX(r.exercice_id).mesure === 'temps' ? r.duree_s + ' s' : fmtNum(r.charge_kg) + '×' + r.reps}${r.type !== 'normale' ? (r.type === 'degressive' ? ' dég.' : ' RP') : ''}</span>`;
+
+/* ---------- Notes et charge à préparer ---------- */
+const noteOf = id => { const n = (H.notes || []).find(x => x.exercice_id === id); return n && n.texte ? n.texte : ''; };
+function chargeFor(it) {
+  if (!it || !it.exId || EX(it.exId).mesure === 'temps') return null;
+  const s = curS(), p = presc(s, defOf(s, it.ordre));
+  const prev = [...it.sets].reverse().find(x => x.type === 'normale');
+  let c = prev ? prev.charge_kg : target(it.exId, s, p);
+  if (c === null || c === undefined) { const lt = lastTime(it.exId); c = lt ? lt.rows[0].charge_kg : null; }
+  return c;
+}
+
+/* ---------- Durée estimée ---------- */
+const tempoSum = t => t ? String(t).split('-').reduce((a, x) => a + (String(x).toUpperCase() === 'X' ? 1 : (+x || 0)), 0) : 3;
+function setSecs(exId, p) {
+  const ex = EX(exId);
+  let t = ex.mesure === 'temps' ? (p.duree_s || 30) : (p.reps_max || 10) * Math.max(2, tempoSum(p.tempo)) + 10;
+  return ex.unilateral ? t * 1.5 : t;
+}
+/* Temps d'un exercice : séries + repos + échauffement + technique + changement de poste */
+function exoSecs(exId, p, sets, warm, lastExo, s) {
+  if (sets <= 0) return 0;
+  let t = sets * (setSecs(exId, p) + (p.repos_s || 60)) + 60;
+  if (lastExo) t -= p.repos_s || 60;
+  if (warm) t += 180;
+  if (p.technique_derniere_serie && !s.decharge) t += 45;
+  return t;
+}
+const warmable = id => { const e = EX(id); return e.type === 'gros' && e.materiel !== 'poids du corps' && e.mesure !== 'temps'; };
+function estRaw(s) {
+  const defs = P.seances[s.seance].exercices;
+  return defs.reduce((t, def, k) => { const id = resolveEx(s, def) || def.choix[0]; const p = presc(s, def); return t + exoSecs(id, p, p.series, warmable(id), k === defs.length - 1, s); }, 0);
+}
+/* Rythme réel : durée des séances passées (1re à dernière série, + 5 min de mise en route) / estimation */
+let paceCache = null;
+function pace() {
+  if (paceCache && paceCache.n === H.series.length) return paceCache.v;
+  const pl = plan(), ratios = [];
+  [...new Set(H.series.map(r => r.index_seance))].forEach(i => {
+    const rs = H.series.filter(r => r.index_seance === i && r.horodatage); const s = pl[i];
+    if (!s || rs.length < 8) return;
+    const span = (Math.max(...rs.map(r => r.horodatage)) - Math.min(...rs.map(r => r.horodatage))) / 1000 + 300;
+    const est = estRaw(s); if (est > 0 && span > 1200 && span < 4 * 3600) ratios.push(span / est);
+  });
+  const last = ratios.slice(-5).sort((a, b) => a - b);
+  const v = last.length ? Math.min(1.3, Math.max(0.7, last[Math.floor(last.length / 2)])) : 1;
+  paceCache = { n: H.series.length, v }; return v;
+}
+const estSession = s => estRaw(s) * pace();
+function remainingSecs() {
+  if (!A || A.step === 'done') return 0;
+  const s = curS(); let t = A.timer ? Math.max(0, (A.timer.end - Date.now()) / 1000) : 0, raw = 0;
+  A.items.forEach((it, k) => {
+    if (k < A.cur.item || !it.exId && k < A.cur.item) return;
+    const def = defOf(s, it.ordre), p = presc(s, def), id = it.exId || def.choix[0];
+    const left = Math.max(0, it.setsPlanned - normalCount(it));
+    const warm = warmable(id) && !it.warmDone && normalCount(it) === 0;
+    raw += exoSecs(id, p, left, warm, k === A.items.length - 1, s);
+  });
+  if (A.timer && A.timer.kind === 'rest') raw -= (curP().repos_s || 60); // le repos en cours est déjà compté par le chrono
+  return t + Math.max(0, raw) * pace();
+}
+function fmtDur(sec) {
+  const m = Math.max(5, Math.round(sec / 300) * 5);
+  return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h ' + z(m % 60);
+}
+const etaTxt = () => { const r = remainingSecs(); return r > 0 ? 'reste ≈ ' + fmtDur(r) : ''; };
 
 /* ---------- Saisie suspecte ---------- */
 function suspectMsg() {
@@ -624,7 +712,9 @@ function timerDone() {
   else if (k === 'effort') { validate('normale'); return; }
   saveA(); render();
 }
+let etaT = 0;
 function tick() {
+  if (A && Date.now() - etaT > 15000) { etaT = Date.now(); const e = document.getElementById('eta'); if (e) e.textContent = etaTxt(); }
   if (A && A.timer) {
     const rem = (A.timer.end - Date.now()) / 1000;
     const el = document.getElementById('tdig'); if (el) el.textContent = mmss(rem);
@@ -705,7 +795,9 @@ function render() {
   if (!inSession) html += `<nav><div class="in">${[['today', 'Séance'], ['cycle', 'Cycle'], ['progres', 'Progrès'], ['chronos', 'Chronos'], ['settings', 'Réglages']].map(([k, l]) => `<button class="${view === k && !sub ? 'on' : ''}" data-a="nav" data-v="${k}">${l}</button>`).join('')}</div></nav>`;
   if (!modal && view === 'today' && !A && P && !missedDismissed) { const m = firstMissed(); if (m) modal = { type: 'missed', i: m.i }; }
   if (modal) html += renderModal();
+  const nt = document.getElementById('note-txt'), keep = nt ? { v: nt.value, a: nt.selectionStart, f: document.activeElement === nt } : null;
   $app.innerHTML = html;
+  if (keep) { const t = document.getElementById('note-txt'); if (t) { t.value = keep.v; if (keep.f) { t.focus(); try { t.setSelectionRange(keep.a, keep.a); } catch {} } } }
 }
 function netBadge() {
   const pend = Q.length;
@@ -729,7 +821,7 @@ function planList(s, active) {
     const cls = it ? (normalCount(it) >= it.setsPlanned ? 'done' : (k === A.cur.item ? 'cur' : '')) : '';
     const meta = [prescLabel(it ? { ...p, series: it.setsPlanned } : p, exId || def.exercice), p.tempo ? 'tempo ' + p.tempo : '', 'repos ' + mmss(p.repos_s)];
     if (p.technique_derniere_serie) meta.push(p.technique_derniere_serie === 'degressive' ? 'dégressive' : 'rest-pause');
-    html += `<li class="${cls}"><div class="t"><div class="name">${esc(nom)}</div><div class="meta">${meta.filter(Boolean).join(', ')}${it ? `, fait ${normalCount(it)}/${it.setsPlanned}` : ''}</div>${it && it.sets.length ? `<div>${it.sets.map(setChip).join('')}</div>` : ''}</div><div class="kg">${tgt > 0 ? fmtNum(tgt) + '<small> kg</small>' : ''}</div></li>`;
+    html += `<li class="${cls}"><div class="t"><div class="name">${esc(nom)}</div><div class="meta">${meta.filter(Boolean).join(', ')}${it ? `, fait ${normalCount(it)}/${it.setsPlanned}` : ''}</div>${exId && noteOf(exId) ? `<div class="pnote">Note : ${esc(noteOf(exId))}</div>` : ''}${it && it.sets.length ? `<div>${it.sets.map(setChip).join('')}</div>` : ''}</div><div class="kg">${tgt > 0 ? fmtNum(tgt) + '<small> kg</small>' : ''}</div></li>`;
   });
   return html + (open ? '</ul>' : '');
 }
@@ -744,7 +836,7 @@ function renderToday() {
   return `${netBadge()}
     <span class="phase-tag">Semaine ${s.week}, ${phaseLabel(s).toLowerCase()}</span>
     <h1>${esc(P.seances[s.seance].nom)}</h1>
-    <p class="muted">${when}${s.decharge ? ', semaine allégée' : s.rir === 0 ? ', dernière série à l’échec' : s.rir != null ? `, arrêter ${s.rir} rep${s.rir > 1 ? 's' : ''} avant l’échec` : ''}</p>
+    <p class="muted">${when}${s.decharge ? ', semaine allégée' : s.rir === 0 ? ', dernière série à l’échec' : s.rir != null ? `, arrêter ${s.rir} rep${s.rir > 1 ? 's' : ''} avant l’échec` : ''}<br>Durée estimée : environ ${fmtDur(estSession(s))}, échauffement compris</p>
     <div class="stripe"></div>
     ${planList(s, false)}
     <div style="margin-top:22px">${isToday ? `<button class="btn" data-a="start">Démarrer la séance</button>` : `<button class="btn ghost" data-a="start">Commencer maintenant</button>`}</div>
@@ -788,7 +880,8 @@ function nextExoInfo() {
   if (k >= A.items.length) return null;
   const s = curS(), def = defOf(s, A.items[k].ordre), it = A.items[k], p = presc(s, def);
   const nom = it.exId ? EX(it.exId).nom : def.choix.map(c => EX(c).nom).join(' ou ');
-  return { nom, txt: `${it.setsPlanned} × ${repsTxt(p)}` };
+  const c = chargeFor(it);
+  return { nom, txt: `${it.setsPlanned} × ${repsTxt(p)}`, kg: c > 0 ? fmtNum(c) + ' kg' : '', note: it.exId ? noteOf(it.exId) : '' };
 }
 function tempoParts(t) { return String(t).split('-').map(x => x.toUpperCase() === 'X' ? 'X' : +x); }
 function renderTempo(t) {
@@ -798,7 +891,7 @@ function renderTempo(t) {
 }
 function renderActive() {
   const s = curS();
-  const top = `<div class="act-top"><span class="phase-tag">${esc(P.seances[s.seance].nom)}, S${s.week}</span><div class="links"><button class="link" data-a="overview">Toute la séance</button><button class="link" data-a="menu">Menu</button></div></div>
+  const top = `<div class="act-top"><span class="phase-tag">${esc(P.seances[s.seance].nom)}, S${s.week}</span><span class="eta" id="eta">${etaTxt()}</span><div class="links"><button class="link" data-a="overview">Toute la séance</button><button class="link" data-a="menu">Menu</button></div></div>
     <div class="progress">${A.items.map((it, k) => `<i class="${normalCount(it) >= it.setsPlanned ? 'd' : k === A.cur.item ? 'c' : ''}"></i>`).join('')}</div>`;
   if (A.step === 'done') {
     const sets = H.series.filter(r => r.index_seance === A.i);
@@ -819,7 +912,8 @@ function renderActive() {
     let next = '';
     if (A.timer.kind === 'rest') {
       const nit = curIt(), np = curP(), first = normalCount(nit) === 0;
-      next = `<div class="next ${first ? 'hot' : ''}"><span class="muted">${first ? 'Exercice suivant' : 'Ensuite'}</span><br><b>${nit.exId ? esc(EX(nit.exId).nom) : 'Choix de l’exercice'}</b><br>Série ${normalCount(nit) + 1} sur ${nit.setsPlanned}, ${repsTxt(np)}</div>`;
+      const kg = chargeFor(nit), nn = nit.exId ? noteOf(nit.exId) : '';
+      next = `<div class="next ${first ? 'hot' : ''}"><span class="muted">${first ? 'Exercice suivant, à préparer' : 'Ensuite'}</span><br><b>${nit.exId ? esc(EX(nit.exId).nom) : 'Choix de l’exercice'}</b><br><span style="display:flex;justify-content:space-between;align-items:baseline;gap:10px"><span>Série ${normalCount(nit) + 1} sur ${nit.setsPlanned}, ${repsTxt(np)}</span>${kg > 0 ? `<span class="nk">${fmtNum(kg)} kg${EX(nit.exId).unilateral ? '<small style="font-size:14px"> /côté</small>' : ''}</span>` : ''}</span>${nn ? `<span class="nn">Note : ${esc(nn)}</span>` : ''}</div>`;
     }
     const stop = A.timer.kind === 'effort' ? `<button class="btn ghost" data-a="effort-stop">Arrêter et enregistrer</button>` : `<button class="btn ghost" data-a="t-skip">Passer</button>`;
     return `<div class="act">${top}<div class="timer"><div class="lbl">${esc(A.timer.label)}</div><div class="dig" id="tdig">${mmss(rem)}</div>
@@ -849,7 +943,7 @@ function renderActive() {
   const tgt = target(it.exId, s, p);
   const info = `Cible <b>${repsTxt(p)}${tgt > 0 ? `, ${fmtNum(tgt)} kg` : ''}</b>${p.technique_derniere_serie && !s.decharge ? `, ${p.technique_derniere_serie === 'degressive' ? 'dégressive' : 'rest-pause'} en fin d’exercice` : ''}<br>${esc(lastTimeLabel(it.exId))}`;
   const nx = nextExoInfo();
-  const nextBox = nx ? `<div class="next ${last ? 'hot' : ''}"><span class="muted">${last ? 'Après cette série' : 'Exercice suivant'}</span> <b>${esc(nx.nom)}</b> <span class="muted">${nx.txt}</span></div>`
+  const nextBox = nx ? `<div class="next ${last ? 'hot' : ''}"><span class="muted">${last ? 'Après cette série' : 'Exercice suivant'}</span> <b>${esc(nx.nom)}</b> <span class="muted">${nx.txt}</span>${nx.kg ? ` <b>${nx.kg}</b>` : ''}</div>`
     : `<div class="next ${last ? 'hot' : ''}"><b>${last ? 'Dernière série de la séance' : 'Dernier exercice de la séance'}</b></div>`;
   let inputs, action;
   if (ex.mesure === 'temps') {
@@ -871,6 +965,7 @@ function renderActive() {
     <div class="sets" style="--n:${Math.max(it.setsPlanned, 4)}">${setLine}</div>
     ${renderTempo(p.tempo)}
     <div class="info">${info}</div>
+    ${noteOf(it.exId) ? `<button class="note" data-a="note-open" data-v="${it.exId}"><b>Note :</b> ${esc(noteOf(it.exId))}</button>` : `<button class="addnote" data-a="note-open" data-v="${it.exId}">+ Ajouter une note pour les prochaines fois</button>`}
     ${inputs}
     ${action}
     ${nextBox}
@@ -906,7 +1001,7 @@ function renderCycle() {
     const ss = pl.filter(s => s.week === w.numero).sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : a.i - b.i);
     const key = w.decharge ? 'decharge' : w.phase;
     return `<div class="week"><div class="wh"><b>Semaine ${w.numero}${w.debut ? `<small style="font-weight:400;opacity:.6;margin-left:8px;white-space:nowrap">${(() => { const a = parseISO(w.debut), z = parseISO(w.debut); z.setDate(z.getDate() + 6); return a.getDate() + (a.getMonth() !== z.getMonth() ? ' ' + MOIS[a.getMonth()] : '') + ' au ' + z.getDate() + ' ' + MOIS[z.getMonth()]; })()}</small>` : ''}</b><span class="ph" style="color:${PHASE_COL[key]}">${w.decharge ? 'Décharge' : PHASES[w.phase]}${!w.decharge && w.reps_en_reserve != null ? `, ${w.reps_en_reserve === 0 ? 'échec' : w.reps_en_reserve + ' en réserve'}` : ''}</span></div>
-      <div class="chips">${ss.map(s => { const d = parseISO(s.date); return `<button class="chip ${s.statut || ''} ${s.date === t ? 'today' : ''}" style="--c:${PHASE_COL[key]}" data-a="plan" data-v="${s.i}"><span class="d">${JOURS[d.getDay()].slice(0, 3)}. ${d.getDate()} ${MOIS[d.getMonth()]}</span><b>${esc(P.seances[s.seance].nom)}</b>${s.statut === 'faite' ? 'faite' : s.statut === 'sautee' ? 'sautée' : s.deplacee ? 'déplacée' : ''}</button>`; }).join('')}</div></div>`;
+      <div class="chips">${ss.map(s => { const d = parseISO(s.date); return `<button class="chip ${s.statut || ''} ${s.date === t ? 'today' : ''}" style="--c:${PHASE_COL[key]}" data-a="plan" data-v="${s.i}"><span class="d">${JOURS[d.getDay()].slice(0, 3)}. ${d.getDate()} ${MOIS[d.getMonth()]}</span><b>${esc(P.seances[s.seance].nom)}</b>${s.statut === 'faite' ? 'faite' : s.statut === 'sautee' ? 'sautée' : s.deplacee ? 'déplacée' : `<span class="du">≈ ${fmtDur(estSession(s))}</span>`}</button>`; }).join('')}</div></div>`;
   }).join('');
   return `<h1>Cycle</h1><p class="muted">Du ${fmtDate(P.meta.debut, true)} au ${fmtDate(P.meta.fin, true)}, lundi, mercredi, jeudi et samedi.</p>
     <h2>Intensité semaine par semaine</h2>
@@ -1041,6 +1136,7 @@ function renderExo(id) {
   const dates = [...new Set(rows.map(r => r.date))].sort().reverse().slice(0, 8);
   return `<button class="link" data-a="back">Retour</button><h1>${esc(ex.nom)}</h1>
     ${fl ? `<div class="kpis"><div><b>${fmtNum(Math.round(fl.last * 2) / 2)} kg</b><span>1RM estimé actuel</span></div><div><b>${fl.last - fl.first >= 0 ? '+' : ''}${fmtNum(Math.round((fl.last - fl.first) * 2) / 2)} kg</b><span>depuis la première séance</span></div></div>` : ''}
+    <h2>Note</h2>${noteOf(id) ? `<button class="note" data-a="note-open" data-v="${id}">${esc(noteOf(id))}</button>` : `<button class="addnote" data-a="note-open" data-v="${id}">+ Ajouter une note (réglage machine, sensation, consigne…)</button>`}
     <h2>Évolution</h2><p class="muted small">Un point par séance. En orange, le 1RM estimé de ta meilleure série du jour. En pointillé, la charge la plus lourde utilisée en série de travail.</p><div class="card">${ex.mesure === 'temps' ? lineChart([]) : timeChart('exo', [{ name: '1RM estimé', color: 'var(--orange)', pts: fl ? fl.pts : [] }, { name: 'Charge de travail max', color: 'var(--muted)', dash: true, pts: topLoads(id) }], { label: 'Évolution du 1RM estimé et de la charge de travail', empty: 'La courbe apparaîtra après deux séances sur cet exercice.' })}</div>
     <h2>Records</h2><p class="muted small">Votre meilleure charge pour chaque nombre de répétitions. Une alerte s’affiche en séance quand vous en battez un.</p>
     ${Object.keys(rec.byReps).length ? `<table><tr><th>Répétitions</th><th class="r">Meilleure charge</th></tr>${Object.keys(rec.byReps).sort((a, b) => a - b).map(r => `<tr><td>${r}</td><td class="r">${fmtNum(rec.byReps[r])} kg</td></tr>`).join('')}</table>` : '<p class="muted">Aucun record pour l’instant.</p>'}
@@ -1050,7 +1146,7 @@ function renderSub() {
   if (sub.type === 'exo') return renderExo(sub.id);
   if (sub.type === 'plan') {
     const s = plan()[sub.i];
-    return `<button class="link" data-a="back">Retour</button><span class="phase-tag" style="display:block;color:${PHASE_COL[phaseKey(s)]}">Semaine ${s.week}, ${phaseLabel(s).toLowerCase()}</span><h1>${esc(P.seances[s.seance].nom)}</h1><p class="muted">${fmtDate(s.date, true)}${s.deplacee ? ` (prévue ${fmtDate(s.dateSlot, true)})` : ''}${s.statut ? ', ' + (s.statut === 'faite' ? 'faite' : 'sautée') : ''}</p>${!s.statut && !(A && A.i === s.i) ? `<div style="margin:8px 0 14px"><button class="btn small ghost" data-a="move-ask" data-v="${s.i}">Changer de jour</button></div>` : ''}<div class="stripe" style="background:${PHASE_COL[phaseKey(s)]}"></div>${planList(s, false)}`;
+    return `<button class="link" data-a="back">Retour</button><span class="phase-tag" style="display:block;color:${PHASE_COL[phaseKey(s)]}">Semaine ${s.week}, ${phaseLabel(s).toLowerCase()}</span><h1>${esc(P.seances[s.seance].nom)}</h1><p class="muted">${fmtDate(s.date, true)}${s.deplacee ? ` (prévue ${fmtDate(s.dateSlot, true)})` : ''}${s.statut ? ', ' + (s.statut === 'faite' ? 'faite' : 'sautée') : `, environ ${fmtDur(estSession(s))}`}</p>${!s.statut && !(A && A.i === s.i) ? `<div style="margin:8px 0 14px"><button class="btn small ghost" data-a="move-ask" data-v="${s.i}">Changer de jour</button></div>` : ''}<div class="stripe" style="background:${PHASE_COL[phaseKey(s)]}"></div>${planList(s, false)}`;
   }
   return '';
 }
@@ -1090,7 +1186,7 @@ function renderSettings() {
     <p class="muted">À faire une seule fois, dans l’ordre : connecter l’app à votre Google Sheet, puis charger le programme.</p>
     <div class="step form"><h2>1. Connexion au Google Sheet</h2>
       <p class="st ${connected ? 'ok' : cfg.url ? 'ko' : 'muted'}">${connected ? 'Connecté' : cfg.url ? (net.ok ? 'Pas encore testé' : 'Échec : ' + esc(net.msg)) : 'Pas encore connecté'}</p>
-      ${connected && scriptV < 2 ? '<p class="ko small">Script Google à mettre à jour : colle la nouvelle version de Code.gs puis Déployer > Gérer les déploiements > Nouvelle version. Sans ça, la correction des séries et le suivi du poids ne sont pas enregistrés dans le Sheet.</p>' : ''}
+      ${connected && scriptV < 3 ? '<p class="ko small">Script Google à mettre à jour : colle la nouvelle version de Code.gs puis Déployer > Gérer les déploiements > crayon > Nouvelle version. Sans ça, les corrections de séries, le poids et les notes ne sont pas enregistrés dans le Sheet.</p>' : ''}
       <p class="muted small">C’est là que vos séries sont enregistrées. L’adresse est celle obtenue en déployant le script Google (elle se termine par /exec). Le mot de passe est celui saisi dans le script (propriété TOKEN).</p>
       <label for="c-url">Adresse du script</label><input id="c-url" value="${esc(cfg.url)}" autocomplete="off" placeholder="https://script.google.com/macros/s/…/exec">
       <label for="c-tok">Mot de passe</label><input id="c-tok" type="password" value="${esc(cfg.token)}" autocomplete="off">
@@ -1144,6 +1240,11 @@ function renderModal() {
       <div class="opts"><button class="btn" data-a="set-save">Enregistrer la correction</button>
       <button class="opt" data-a="set-del" style="color:var(--red)">${modal.confirmDel ? 'Confirmer : supprimer définitivement' : 'Supprimer cette série'}${r.type === 'normale' && H.series.some(x => x.serie_parent_id === r.id) ? '<small>La dégressive ou le rest-pause rattaché sera aussi supprimé.</small>' : ''}</button>
       <button class="opt" data-a="set-cancel">Annuler</button></div>`;
+  } else if (modal.type === 'note') {
+    inner = `<h3>Note : ${esc(EX(modal.id).nom)}</h3><p class="muted small">Elle s’affichera à chaque fois que tu feras cet exercice, et pendant le repos qui le précède.</p>
+      ${scriptV < 3 ? '<p class="ko small">Le script Google n’est pas à jour : la note restera sur ce téléphone seulement. Voir Réglages, étape 1.</p>' : ''}
+      <textarea id="note-txt" maxlength="300" placeholder="Ex. : siège cran 4, prises serrées, monter à 35 kg la prochaine fois">${esc(noteOf(modal.id))}</textarea>
+      <div class="opts" style="margin-top:12px"><button class="btn" data-a="note-save">Enregistrer</button>${noteOf(modal.id) ? '<button class="opt" data-a="note-del" style="color:var(--red)">Effacer la note</button>' : ''}<button class="opt" data-a="modal-close">Annuler</button></div>`;
   } else if (modal.type === 'suspect') {
     inner = `<h3>Vérifie ta saisie</h3><p>${esc(modal.msg)}</p><div class="opts">
       <button class="opt" data-a="suspect-fix">${modal.effort ? 'Ne pas enregistrer, relancer' : 'Corriger'}</button>
@@ -1272,6 +1373,9 @@ const ACT = {
   'set-cancel'() { modal = modal.back ? { type: modal.back } : null; render(); },
   'suspect-ok'() { const m = modal; modal = null; validate(m.kind); },
   'suspect-fix'() { if (modal.effort) A.draft.duree = curP().duree_s || 30; modal = null; saveA(); render(); },
+  'note-open'(d) { modal = { type: 'note', id: d.v }; render(); setTimeout(() => { const t = document.getElementById('note-txt'); if (t) t.focus(); }, 50); },
+  'note-save'() { const t = (document.getElementById('note-txt').value || '').trim().slice(0, 300); saveNote(modal.id, t); modal = null; toast(t ? 'Note enregistrée' : 'Note effacée', ''); render(); },
+  'note-del'() { saveNote(modal.id, ''); modal = null; toast('Note effacée', ''); render(); },
   'skip-ask'() { modal = { type: 'skip' }; render(); },
   'skip-ok'() { modal = null; advanceExo(); },
   'warm-tick'(d) { A.warm = A.warm || []; A.warm[+d.v] = !A.warm[+d.v]; saveA(); render(); },
@@ -1346,7 +1450,7 @@ const ACT = {
   async 'reset-ok'() {
     try {
       await api('reset');
-      H = { series: [], seances: [], modifications: [], poids: H.poids || [] }; saveH();
+      H = { series: [], seances: [], modifications: [], poids: H.poids || [], notes: H.notes || [] }; saveH();
       Q = []; LS.set('queue', Q); A = null; saveA(); missedDismissed = false;
       modal = null; toast('Données effacées', 'Vous repartez de zéro.'); render();
     } catch (e) {
