@@ -230,6 +230,25 @@ textarea{width:100%;min-height:110px;border-radius:12px;border:1px solid var(--l
   body{background:#fff}
   main{padding:0}
 }
+.rir{display:flex;align-items:center;gap:8px}
+.rir label{font:600 15px var(--num);color:var(--muted);white-space:nowrap}
+.rir .c{flex:1;display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.rir .c button{background:var(--surf2);border-radius:10px;height:38px;font:700 19px var(--num)}
+.rir .c button.on{background:var(--acc);color:var(--acc-ink)}
+.exo-name .ti{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:50%;border:2px solid var(--muted);color:var(--muted);font:700 16px var(--num);vertical-align:middle;margin-left:8px}
+.gen ol{margin:0;padding-left:20px;line-height:1.45;font-size:16px}
+.alert{background:var(--surf);border-left:4px solid var(--yellow);border-radius:10px;padding:10px 12px;margin:12px 0;font-size:15px}
+.alert .row{margin-top:8px;gap:8px}
+.alert .row button{background:var(--surf2);border-radius:10px;padding:9px 6px;font:700 16px var(--num)}
+.alert .row button.y{background:var(--acc);color:var(--acc-ink)}
+.point{background:var(--surf);border-radius:14px;padding:12px 14px;margin:12px 0}
+.point h3{margin:0 0 6px;font:700 20px var(--num)}
+.point .k{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;font-size:15px}
+.point .k b{font:700 18px var(--num)}
+.point .tip{margin-top:8px;font-size:15px;color:var(--ink)}
+.jr{display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;padding:11px 0;border-bottom:1px solid var(--line);text-align:left}
+.jr .m{color:var(--muted);font-size:14px}
+@media (max-height:740px){.rir .c button{height:32px;font-size:17px}}
 .pz{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--line);font-size:16px}
 
 /* Cycle */
@@ -302,7 +321,7 @@ summary{font:600 21px var(--num);cursor:pointer}
 <div id="toast"></div>
 <script>
 'use strict';
-const APP_VERSION = '11';
+const APP_VERSION = '12';
 
 /* ---------- Utilitaires ---------- */
 const LS = {
@@ -338,7 +357,7 @@ const bool = v => v === true || v === 'TRUE' || v === 'true' || v === 1;
 let cfg = LS.get('cfg', { url: '', token: '' });
 let P = LS.get('programme', null);
 let H = LS.get('hist', { series: [], seances: [], modifications: [], poids: [] });
-H.poids = H.poids || []; H.notes = H.notes || [];
+H.poids = H.poids || []; H.notes = H.notes || []; H.pas = H.pas || [];
 let scriptV = LS.get('scriptv', 1);
 function applyTheme() { document.documentElement.dataset.theme = LS.get('theme', 'dark'); }
 applyTheme();
@@ -390,6 +409,8 @@ function applyOp(q) {
   else if (q.action === 'addModification') { if (!has(H.modifications)) H.modifications.push(d); }
   else if (q.action === 'addPoids') { if (!has(H.poids)) H.poids.push(d); }
   else if (q.action === 'deletePoids') H.poids = H.poids.filter(x => x.id !== d.id);
+  else if (q.action === 'addPas') { H.pas = H.pas.filter(x => x.date !== d.date); H.pas.push(d); }
+  else if (q.action === 'deletePas') H.pas = H.pas.filter(x => x.id !== d.id);
   else if (q.action === 'setNote') { H.notes = H.notes.filter(x => x.exercice_id !== d.exercice_id); if (d.texte) H.notes.push(d); }
   else if (q.action === 'updateSerie') { const r = has(H.series); if (r) Object.assign(r, d); }
   else if (q.action === 'deleteSerie') H.series = H.series.filter(x => x.id !== d.id && x.serie_parent_id !== d.id);
@@ -399,7 +420,7 @@ async function refresh() {
   try {
     const j = await api('getAll');
     if (j.programme) { P = j.programme; LS.set('programme', P); seqCache = null; }
-    H = { series: j.series.map(normSerie), seances: j.seances.map(normSeance), modifications: j.modifications.map(normMod), poids: (j.poids || []).map(normPoids), notes: (j.notes || []).map(r => ({ exercice_id: String(r.exercice_id), texte: String(r.texte ?? ''), horodatage: num(r.horodatage) })) };
+    H = { series: j.series.map(normSerie), seances: j.seances.map(normSeance), modifications: j.modifications.map(normMod), poids: (j.poids || []).map(normPoids), notes: (j.notes || []).map(r => ({ exercice_id: String(r.exercice_id), texte: String(r.texte ?? ''), horodatage: num(r.horodatage) })), pas: (j.pas || []).map(r => ({ id: String(r.id), horodatage: num(r.horodatage), date: String(r.date).replace(/^'/, '').slice(0, 10), pas: num(r.pas) || 0 })) };
     scriptV = j.scriptVersion || 1; LS.set('scriptv', scriptV);
     fixDayShift();
     for (const q of Q) applyOp(q);
@@ -433,12 +454,48 @@ setInterval(flush, 15000);
 
 /* ---------- Planning ---------- */
 let seqCache = null;
+/* Décharge avancée : la semaine choisie devient décharge, la décharge prévue de la phase redevient une semaine normale */
+function weekOverrides() {
+  const o = {};
+  if (!P) return o;
+  H.seances.filter(r => r.statut === 'decharge_avancee').forEach(r => {
+    const w = -num(r.index_seance), W = P.semaines[w - 1]; if (!W) return;
+    const d = P.semaines.find(x => x.phase === W.phase && x.decharge && x.numero > w);
+    o[w] = { decharge: true };
+    if (d) o[d.numero] = { decharge: false, reps_en_reserve: W.reps_en_reserve };
+  });
+  return o;
+}
+const effWeek = w => ({ ...w, ...(weekOverrides()[w.numero] || {}) });
+let seqKey = '';
 function seq() {
   if (!P) return [];
-  if (seqCache) return seqCache;
+  const ov = weekOverrides(), key = JSON.stringify(ov);
+  if (seqCache && seqKey === key) return seqCache;
   const v = [];
-  P.semaines.forEach(w => w.seances.forEach(s => v.push({ i: v.length, week: w.numero, phase: w.phase, decharge: !!w.decharge, rir: w.reps_en_reserve, seance: s.seance, datePrevue: s.date })));
-  return (seqCache = v);
+  P.semaines.forEach(w0 => { const w = { ...w0, ...(ov[w0.numero] || {}) }; w.seances.forEach(s => v.push({ i: v.length, week: w.numero, phase: w.phase, decharge: !!w.decharge, rir: w.reps_en_reserve, seance: s.seance, datePrevue: s.date })); });
+  seqKey = key; return (seqCache = v);
+}
+/* Recul des gros mouvements sur 2 séances de suite (−3 % sous le meilleur de la phase) */
+function regression() {
+  const ns = nextSession(); if (!ns || ns.decharge) return null;
+  const W = effWeek(P.semaines[ns.week - 1]);
+  const dl = P.semaines.map(effWeek).find(x => x.phase === W.phase && x.decharge && x.numero > ns.week);
+  if (!dl) return null;
+  if (LS.get('deload-dismiss', 0) === ns.week) return null;
+  const ids = [...new Set(H.series.filter(r => r.type === 'normale' && r.phase === W.phase && !r.decharge && EX(r.exercice_id).type === 'gros').map(r => r.exercice_id))];
+  const down = ids.filter(id => {
+    const by = {}; workSets(id).filter(r => r.phase === W.phase && !r.decharge).forEach(r => { const e = e1rm(r.charge_kg, r.reps); if (e) by[r.date] = Math.max(by[r.date] || 0, e); });
+    const v = Object.keys(by).sort().map(d => by[d]); if (v.length < 3) return false;
+    const best = Math.max(...v.slice(0, -2));
+    return v[v.length - 1] < best * 0.97 && v[v.length - 2] < best * 0.97;
+  });
+  return down.length >= 2 ? { w: ns.week, dl: dl.numero, ids: down } : null;
+}
+function regressionHtml() {
+  const r = regression(); if (!r) return '';
+  return `<div class="alert"><b>Tes gros mouvements reculent</b> depuis 2 séances (${r.ids.map(id => esc(EX(id).nom)).join(', ')}). C’est un signe de fatigue accumulée. Avancer la décharge à cette semaine ? La semaine ${r.dl} redeviendra une semaine normale.
+    <div class="row"><button class="y" data-a="deload-ok" data-v="${r.w}">Avancer la décharge</button><button data-a="deload-no" data-v="${r.w}">Pas maintenant</button></div></div>`;
 }
 function slots(n) {
   const out = []; const d = parseISO(P.meta.debut); const jours = [1, 3, 4, 6];
@@ -540,7 +597,8 @@ function target(id, s, p) {
     const d = inPhase.reduce((m, r) => r.date > m ? r.date : m, '');
     const last = inPhase.filter(r => r.date === d);
     const ch = Math.max(...last.map(r => r.charge_kg));
-    const ok = last.every(r => r.reps >= (r.reps_max || p.reps_max));
+    const grind = (s.rir ?? 0) >= 2 && last.some(r => r.rpe >= 10);
+    const ok = last.every(r => r.reps >= (r.reps_max || p.reps_max)) && !grind;
     base = ch > 0 && ok ? ch + step : ch;
   } else {
     const best = Math.max(0, ...hist.map(r => e1rm(r.charge_kg, r.reps) || 0));
@@ -729,8 +787,13 @@ function startSession(s) {
     items: P.seances[s.seance].exercices.map(def => ({ ordre: def.ordre, exId: resolveEx(s, def), setsPlanned: presc(s, def).series, sets: [] })),
     cur: { item: 0 }, step: 'input', timer: null, draft: null
   };
-  prepareStep(); saveA(); requestWake(); view = 'today'; render();
+  A.step = 'general'; saveA(); requestWake(); view = 'today'; render();
 }
+const MOBI = {
+  haut: ['10 passages d’épaules avec un élastique ou un bâton, bras tendus', '15 face pulls légers à la poulie, coudes hauts', '8 rotations thoraciques au sol de chaque côté', '1 série légère de 15 pompes ou de tirage, sans forcer'],
+  bas: ['10 squats au poids du corps, lents et profonds', '6 fentes avant avec rotation du buste de chaque côté', '10 balanciers de jambe avant-arrière puis latéraux de chaque côté', '30 s d’étirement des mollets et des chevilles contre un mur']
+};
+const mobiFor = s => MOBI[/jambes/.test(s.seance) ? 'bas' : 'haut'];
 function prepareStep() {
   const it = curIt();
   if (!it.exId) { A.step = 'choose'; return; }
@@ -809,6 +872,7 @@ function timerDone() {
   if (k === 'rest') { A.step = 'input'; prepareStep(); }
   else if (k === 'rp') { A.step = 'rp-input'; A.draft = { ...A.draft, reps: 3, rpe: null }; }
   else if (k === 'effort') { validate('normale'); return; }
+  else if (k === 'general') { A.step = 'general'; }
   saveA(); render();
 }
 let etaT = 0;
@@ -958,7 +1022,10 @@ function renderToday() {
     <span class="phase-tag">Semaine ${s.week}, ${phaseLabel(s).toLowerCase()}</span>
     <h1>${esc(P.seances[s.seance].nom)}</h1>
     <p class="muted">${when}${s.decharge ? ', semaine allégée' : s.rir === 0 ? ', dernière série à l’échec' : s.rir != null ? `, arrêter ${s.rir} rep${s.rir > 1 ? 's' : ''} avant l’échec` : ''}<br>Durée estimée : environ ${fmtDur(estSession(s))}, échauffement compris</p>
+    ${regressionHtml()}
     ${recapHtml(s)}
+    ${pesageHtml()}
+    ${pointToday()}
     <div class="stripe"></div>
     ${planList(s, false)}
     <div style="margin-top:22px">${isToday ? `<button class="btn" data-a="start">Démarrer la séance</button>` : `<button class="btn ghost" data-a="start">Commencer maintenant</button>`}</div>
@@ -1022,7 +1089,9 @@ function renderActive() {
     return `<div class="empty"><h1>Séance terminée</h1><p class="muted">${esc(P.seances[s.seance].nom)}, semaine ${s.week}</p>
       <table style="margin:22px 0"><tr><td>Durée</td><td class="r">${Math.floor(dur / 60)} h ${z(dur % 60)}</td></tr><tr><td>Séries</td><td class="r">${sets.length}</td></tr><tr><td>Tonnage</td><td class="r">${fmtNum(Math.round(ton))} kg${tonDelta(s, ton)}</td></tr><tr><td>Records battus</td><td class="r">${A.prs}</td></tr></table>
       ${bilanTable()}
-      <button class="btn" data-a="close" style="margin-top:22px">Fermer</button>
+      <button class="btn ghost" data-a="sante" style="margin-top:22px">Envoyer à Santé (iPhone)</button>
+      <p class="muted small" style="margin-top:6px">Nécessite le raccourci « Logbook Santé ». Inutile si tu as lancé l’entraînement sur ta montre.</p>
+      <button class="btn" data-a="close" style="margin-top:14px">Fermer</button>
       <div style="margin-top:16px"><button class="link" data-a="cancel-ask" data-v="${A.i}">Séance lancée par erreur ? L’annuler</button></div></div>`;
   }
   const it = curIt();
@@ -1043,6 +1112,17 @@ function renderActive() {
       <div class="bar"><i id="tbar" style="transform:scaleX(${Math.max(0, rem / A.timer.total)})"></i></div>
       ${A.timer.kind !== 'effort' ? `<div class="row"><button class="btn ghost small" data-a="t-add" data-v="-15">−15 s</button><button class="btn ghost small" data-a="t-add" data-v="15">+15 s</button></div>` : ''}
       ${stop}${adjBox()}${next}</div></div>`;
+  }
+  if (A.step === 'general') {
+    return `<div class="act">${top}
+      <h1 class="exo-name">Échauffement général</h1>
+      <p class="info" style="margin:0">5 minutes de cardio léger (rameur, vélo ou elliptique) pour monter en température, puis :</p>
+      <div class="card gen"><ol>${mobiFor(s).map(x => `<li>${esc(x)}</li>`).join('')}</ol></div>
+      <p class="info" style="margin:0">Ensuite, l’app te proposera les séries d’approche du premier exercice.</p>
+      <div style="flex:1"></div>
+      <button class="btn ghost" data-a="gen-timer">Lancer 5 min de cardio</button>
+      <button class="btn validate" data-a="gen-done">C’est fait, on commence</button>
+      <div class="act-links"><button class="link" data-a="gen-done">Passer l’échauffement</button><button class="link" data-a="stop">Arrêter</button></div></div>`;
   }
   if (A.step === 'calib') {
     const ex = EX(it.exId), p = curP(), c = A.draft.charge;
@@ -1091,14 +1171,14 @@ function renderActive() {
     inputs = `<div class="inputs">
       <div class="box"><label>Reps</label><button class="v" data-a="type" data-k="reps">${d.reps}</button><div class="g"><button data-a="adj" data-k="reps" data-v="-1">−1</button><button data-a="adj" data-k="reps" data-v="1">+1</button></div></div>
       <div class="box"><label>Charge${ex.unilateral ? ' par côté' : ''}</label><button class="v" data-a="type" data-k="charge">${fmtNum(d.charge)}<small>kg</small></button><div class="g">${[-2.5, 2.5, -5, 5].map(v => `<button data-a="adj" data-k="charge" data-v="${v}">${v > 0 ? '+' : '−'}${fmtNum(Math.abs(v))}</button>`).join('')}</div></div></div>
-      ${A.step === 'input' ? `<div class="rpe"><label>RPE (facultatif)</label><input type="range" min="6" max="10" step="0.5" value="${d.rpe ?? 8}" id="rpe"><span class="rv" id="rpev">${d.rpe ? fmtNum(d.rpe) : '–'}</span></div>` : ''}`;
+      ${A.step === 'input' ? `<div class="rir"><label>Il en restait</label><div class="c">${[0, 1, 2, 3].map(v => `<button class="${d.rpe != null && 10 - d.rpe === v ? 'on' : ''}" data-a="rir" data-v="${v}">${v === 3 ? '3+' : v}</button>`).join('')}</div></div>` : ''}`;
     action = `<button class="btn validate" data-a="${act}">${A.step === 'input' ? 'Valider la série' : 'Valider'}</button>`;
   }
   const links = (A.step === 'degressive' || A.step === 'rp-input')
     ? `<button class="link" data-a="skip-tech">Passer la technique</button><button class="link" data-a="stop">Arrêter</button>`
     : `<button class="link" data-a="sets" data-v="1">+ série</button><button class="link" data-a="sets" data-v="-1">− série</button><button class="link" data-a="replace">Remplacer</button><button class="link" data-a="skip-ask">Passer</button><button class="link" data-a="stop">Arrêter</button>`;
   return `<div class="act">${top}
-    <h1 class="exo-name">${esc(ex.nom)}</h1>
+    <h1 class="exo-name" data-a="tech" data-v="${it.exId}">${esc(ex.nom)}${ex.consigne ? '<span class="ti" aria-label="Technique">?</span>' : ''}</h1>
     <div class="sets" style="--n:${Math.max(it.setsPlanned, 4)}">${setLine}</div>
     ${renderTempo(p.tempo)}
     <div class="info">${info}</div>
@@ -1133,9 +1213,9 @@ function weekEffort(w) { return w.decharge ? 0.3 : ({ 3: 0.55, 2: 0.7, 1: 0.85, 
 function renderCycle() {
   const pl = plan(), t = todayISO();
   const ns = nextSession(); const curW = ns ? ns.week : null;
-  const bars = P.semaines.map(w => `<div class="${w.numero === curW ? 'now' : ''}" style="height:${Math.round(weekEffort(w) * 100)}%;background:${PHASE_COL[w.decharge ? 'decharge' : w.phase]}"></div>`).join('');
+  const bars = P.semaines.map(effWeek).map(w => `<div class="${w.numero === curW ? 'now' : ''}" style="height:${Math.round(weekEffort(w) * 100)}%;background:${PHASE_COL[w.decharge ? 'decharge' : w.phase]}"></div>`).join('');
   const phases = ['hypertrophie', 'force', 'hypertrophie_intensifiee', 'decharge'].map(k => `<div style="--c:${PHASE_COL[k]}"><b>${k === 'decharge' ? 'Décharge' : PHASES[k]}</b><em>${PHASE_INFO[k][0]}</em><p>${PHASE_INFO[k][1]}</p></div>`).join('');
-  const weeks = P.semaines.map(w => {
+  const weeks = P.semaines.map(effWeek).map(w => {
     const ss = pl.filter(s => s.week === w.numero).sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : a.i - b.i);
     const key = w.decharge ? 'decharge' : w.phase;
     return `<div class="week"><div class="wh"><b>Semaine ${w.numero}${w.debut ? `<small style="font-weight:400;opacity:.6;margin-left:8px;white-space:nowrap">${(() => { const a = parseISO(w.debut), z = parseISO(w.debut); z.setDate(z.getDate() + 6); return a.getDate() + (a.getMonth() !== z.getMonth() ? ' ' + MOIS[a.getMonth()] : '') + ' au ' + z.getDate() + ' ' + MOIS[z.getMonth()]; })()}</small>` : ''}</b><span class="ph" style="color:${PHASE_COL[key]}">${w.decharge ? 'Décharge' : PHASES[w.phase]}${!w.decharge && w.reps_en_reserve != null ? `, ${w.reps_en_reserve === 0 ? 'échec' : w.reps_en_reserve + ' en réserve'}` : ''}</span></div>
@@ -1235,10 +1315,12 @@ function renderProgres() {
     return `<button data-a="exo" data-v="${id}"><span class="nm">${esc(EX(id).nom)}</span><span class="kg">${fl ? fmtNum(Math.round(fl.last * 2) / 2) + ' kg' : '–'}${gain > 0.4 ? `<span class="up">+${fmtNum(Math.round(gain * 2) / 2)} kg depuis le début</span>` : ''}</span></button>`;
   }).join('')}</div>`).join('');
   return `<h1>Progrès</h1>
-    <div class="row" style="margin-top:10px"><button class="btn small ghost" data-a="sub" data-v="bilan">Bilan du bloc</button><button class="btn small ghost" data-a="sub" data-v="records">Mur des records</button></div>
+    <div class="row" style="margin-top:10px"><button class="btn small ghost" data-a="sub" data-v="journal">Journal</button><button class="btn small ghost" data-a="sub" data-v="records">Records</button><button class="btn small ghost" data-a="sub" data-v="bilan">Bilan</button></div>
+    ${weekPoint(new Date().getDay() === 0 || curWeekObj().numero === 1 ? curWeekObj() : P.semaines[curWeekObj().numero - 2])}
     <div class="kpis" style="margin-top:12px"><div><b>${done}<span class="muted" style="font-size:18px"> / ${seq().length}</span></b><span>séances faites</span></div><div><b>${H.series.length}</b><span>séries enregistrées</span></div><div><b>${fmtNum(Math.round(totalTon / 100) / 10)} t</b><span>soulevées au total</span></div><div><b>${prCount()}</b><span>records battus</span></div></div>
     ${weekMuscles()}
     ${poidsSection()}
+    ${pasSection()}
     <h2>Tonnage par semaine</h2>
     <p class="muted small">Le tonnage additionne charge × répétitions de toutes vos séries : c’est votre volume de travail. Il doit grimper pendant les phases d’hypertrophie, baisser un peu en force, et nettement en décharge.</p>
     <div class="card"><svg viewBox="0 0 340 134" width="100%">${bars}</svg></div>
@@ -1246,6 +1328,97 @@ function renderProgres() {
     <p class="muted small">Le chiffre est votre 1RM estimé : la charge que vous pourriez soulever une seule fois, calculée à partir de vos séries (formule d’Epley). Il permet de comparer une série à 5 reps et une série à 10 reps sur la même échelle. Touchez un exercice pour le détail.</p>
     ${ids.length ? list : '<p class="muted">Rien d’enregistré pour l’instant.</p>'}`;
 }
+/* ---------- Pas quotidiens ---------- */
+const fmtInt = n => Math.round(n).toLocaleString('fr-FR');
+const pasAvg = (from, to) => { const r = H.pas.filter(p => p.date >= from && p.date <= to && p.pas > 0); return r.length ? Math.round(r.reduce((a, p) => a + p.pas, 0) / r.length) : null; };
+function pasSection() {
+  const head = `<h2>Pas quotidiens</h2><p class="muted small">Cible : 8 000 à 10 000 pas par jour. En prise de masse sèche, l’activité du quotidien limite le gras sans gêner la récupération.</p>`;
+  if (scriptV < 5) return head + '<p class="muted small">Pour activer le suivi des pas, mets à jour le script Google (voir Réglages, étape 1).</p>';
+  const t = todayISO(), days = Array.from({ length: 14 }, (_, k) => addDays(t, k - 13));
+  const by = {}; H.pas.forEach(p => { by[p.date] = p.pas; });
+  const avg = pasAvg(addDays(t, -6), t), max = Math.max(12000, ...days.map(d => by[d] || 0));
+  const W = 340, Hh = 150, B = 22, bw = 18, gap = (W - 14 * bw) / 13, Y = v => (Hh - B) * (1 - v / max);
+  chartTips.pas = [];
+  const bars = days.map((d, k) => { const v = by[d] || 0, x = k * (bw + gap); const i = chartTips.pas.push(`${fmtDate(d, true)} : ${v ? fmtInt(v) + ' pas' : 'non saisi'}`) - 1;
+    return `${v ? `<path d="M${x} ${Hh - B} V${(Y(v) + 4).toFixed(1)} q0 -4 4 -4 h${bw - 8} q4 0 4 4 V${Hh - B} Z" fill="${v >= 8000 ? 'var(--acc)' : 'var(--muted)'}"/>` : ''}<rect x="${x}" y="0" width="${bw}" height="${Hh - B}" fill="transparent" data-a="tip" data-k="pas" data-v="${i}"/>${k % 2 === 1 ? `<text x="${x + bw / 2}" y="${Hh - 6}" text-anchor="middle">${parseISO(d).getDate()}</text>` : ''}`; }).join('');
+  const band = `<rect x="0" y="${Y(10000).toFixed(1)}" width="${W}" height="${(Y(8000) - Y(10000)).toFixed(1)}" fill="var(--green)" opacity=".16"/>`;
+  return head + `<div class="kpis"><div><b>${avg ? fmtInt(avg) : '–'}</b><span>pas par jour, moyenne 7 jours</span></div><div><b>${by[t] ? fmtInt(by[t]) : '–'}</b><span>aujourd’hui${by[addDays(t, -1)] ? `, hier ${fmtInt(by[addDays(t, -1)])}` : ''}</span></div></div>
+    <div class="card" style="margin-top:10px"><svg viewBox="0 0 ${W} ${Hh}" width="100%" role="img" aria-label="Pas des 14 derniers jours">${band}${bars}</svg><div class="tip" id="tip-pas">Zone verte : 8 000 à 10 000 pas. Touche une barre pour la valeur.</div></div>
+    <div style="margin-top:12px"><button class="btn small ghost" data-a="pas-open">Saisir mes pas</button></div>`;
+}
+
+/* ---------- Point de la semaine ---------- */
+function weekPoint(w) {
+  const W = effWeek(w), a = w.debut, z = addDays(w.debut, 6), pl = plan(), prevW = P.semaines[w.numero - 2];
+  const ss = pl.filter(s => s.week === w.numero), done = ss.filter(s => s.statut === 'faite').length, planned = ss.filter(s => s.statut !== 'sautee').length;
+  const sets = H.series.filter(r => r.type === 'normale' && r.date >= a && r.date <= z);
+  const ton = sets.reduce((t, r) => t + r.charge_kg * r.reps, 0);
+  const ton0 = prevW ? H.series.filter(r => r.date >= prevW.debut && r.date <= addDays(prevW.debut, 6)).reduce((t, r) => t + r.charge_kg * r.reps, 0) : 0;
+  const prs = prList().filter(x => x.r.date >= a && x.r.date <= z).length;
+  const pz = H.poids.filter(p => p.poids_kg > 0), wAvg = (x, y) => { const r = pz.filter(p => p.date >= x && p.date <= y); return r.length ? r.reduce((s2, p) => s2 + p.poids_kg, 0) / r.length : null; };
+  const pw = wAvg(a, z), pw0 = prevW ? wAvg(prevW.debut, addDays(prevW.debut, 6)) : null, nPes = pz.filter(p => p.date >= a && p.date <= z).length;
+  const steps = pasAvg(a, z);
+  const fails = sets.filter(r => r.rpe >= 10).length;
+  const next = P.semaines[w.numero] ? effWeek(P.semaines[w.numero]) : null;
+  const tips = [];
+  if (planned - done >= 2 && todayISO() > z) tips.push(`${planned - done} séances manquées. Si ça se répète, dis-le moi : on peut passer certaines semaines à 3 séances plutôt que d’en sauter.`);
+  if (!W.decharge && (W.reps_en_reserve ?? 0) >= 2 && fails >= 3) tips.push(`${fails} séries à l’échec alors que la semaine demandait ${W.reps_en_reserve} reps en réserve. Garde de la marge : c’est ce qui permet de progresser la semaine suivante.`);
+  if (nPes < 2) tips.push('Moins de 2 pesées cette semaine : pèse-toi 3 matins, à jeun, pour que la tendance soit fiable.');
+  else if (pw != null && pw0 != null) { const dlt = pw - pw0; if (dlt > 0.6) tips.push(`Poids moyen +${fmtNum(Math.round(dlt * 10) / 10)} kg sur la semaine : c’est plus rapide que la cible (+0,25 à +0,5 kg). Surveille les excès.`); else if (dlt < 0.1) tips.push('Poids stable ou en baisse : pour une prise de masse, il faut un léger surplus. Ajoute une collation.'); }
+  if (steps != null && steps < 7000) tips.push(`${fmtInt(steps)} pas par jour en moyenne : vise 8 000, une marche de 20 minutes suffit.`);
+  if (prs) tips.push(`${prs} record${prs > 1 ? 's' : ''} battu${prs > 1 ? 's' : ''} cette semaine. Bien joué.`);
+  if (next) tips.push(next.decharge ? 'Semaine prochaine : décharge. Charges à −10 %, moitié des séries, rien à l’échec.' : `Semaine prochaine : ${PHASES[next.phase].toLowerCase()}, ${next.reps_en_reserve === 0 ? 'dernière série à l’échec sur machines' : next.reps_en_reserve + (next.reps_en_reserve > 1 ? ' reps' : ' rep') + ' en réserve'}.`);
+  const dt = ton0 ? Math.round((ton / ton0 - 1) * 100) : null;
+  return `<div class="point"><h3>Point de la semaine ${w.numero}</h3><div class="k">
+    <span>Séances <b>${done} / ${planned}</b></span><span>Séries <b>${sets.length}</b></span>
+    <span>Tonnage <b>${fmtNum(Math.round(ton / 100) / 10)} t</b>${dt != null && ton ? ` <span class="dl ${dt >= 0 ? 'up' : 'down'}">${dt >= 0 ? '+' : ''}${dt} %</span>` : ''}</span><span>Records <b>${prs}</b></span>
+    <span>Poids moyen <b>${pw != null ? fmtNum(Math.round(pw * 10) / 10) + ' kg' : '–'}</b></span><span>Pas / jour <b>${steps != null ? fmtInt(steps) : '–'}</b></span></div>
+    ${tips.slice(0, 3).map(t => `<p class="tip">${esc(t)}</p>`).join('')}</div>`;
+}
+const curWeekObj = () => { const t = todayISO(); return [...P.semaines].reverse().find(x => x.debut <= t) || P.semaines[0]; };
+function pointToday() {
+  const d = new Date().getDay(), cw = curWeekObj();
+  if (d === 0) return weekPoint(cw);
+  if (d === 1 && cw.numero > 1) return weekPoint(P.semaines[cw.numero - 2]);
+  return '';
+}
+
+function santeURL() {
+  const rs = H.series.filter(r => r.index_seance === A.i && r.horodatage), t0 = rs.length ? Math.min(...rs.map(r => r.horodatage)) - 300000 : A.startedAt;
+  const min = Math.max(10, Math.round(((A.endedAt || Date.now()) - t0) / 60000)), d = new Date(t0);
+  return 'shortcuts://run-shortcut?name=' + encodeURIComponent('Logbook Santé') + '&input=text&text=' + encodeURIComponent(`${iso(d)} ${z(d.getHours())}:${z(d.getMinutes())}|${min}`);
+}
+/* ---------- Rappel de pesée ---------- */
+function pesageHtml() {
+  const l = [...H.poids].filter(p => p.poids_kg > 0).sort((a, b) => a.date < b.date ? -1 : 1).pop();
+  const n = l ? Math.round((parseISO(todayISO()) - parseISO(l.date)) / 864e5) : null;
+  if (n !== null && n < 3) return '';
+  const matin = new Date().getHours() < 12;
+  return `<div class="alert" style="border-left-color:var(--acc)">${l ? `Dernière pesée il y a ${n} jours.` : 'Aucune pesée enregistrée.'} ${matin ? 'Pèse-toi maintenant, à jeun.' : 'Pense à te peser demain matin, à jeun.'}${matin ? '<div class="row"><button class="y" data-a="poids-open">Ajouter ma pesée</button></div>' : ''}</div>`;
+}
+
+/* ---------- Journal des séances ---------- */
+function journal() {
+  const by = {};
+  H.series.forEach(r => { (by[r.index_seance] = by[r.index_seance] || []).push(r); });
+  return Object.keys(by).map(i => { const rs = by[i], h = rs.map(r => r.horodatage).filter(Boolean); return { i: +i, rs, seance: rs[0].seance, date: rs.map(r => r.date).sort()[0], t0: Math.min(...h), t1: Math.max(...h) }; }).sort((a, b) => b.t0 - a.t0);
+}
+function renderJournal() {
+  const J = journal();
+  return `<button class="link" data-a="back">Retour</button><h1>Journal</h1><p class="muted small">Toutes tes séances, de la plus récente à la plus ancienne. Touche une séance pour le détail.</p>
+    ${J.length ? J.map(j => { const ton = j.rs.reduce((t, r) => t + r.charge_kg * r.reps, 0), min = Math.round((j.t1 - j.t0) / 60000) + 5;
+      return `<button class="jr" data-a="jsess" data-v="${j.i}"><span><b>${esc(P.seances[j.seance] ? P.seances[j.seance].nom : j.seance)}</b><br><span class="m">${fmtDate(j.date, true)}, ${(n => n + (n > 1 ? " séries" : " série"))(j.rs.filter(r => r.type === "normale").length)}, ${fmtNum(Math.round(ton))} kg</span></span><span class="m">≈ ${fmtDur(min * 60)}</span></button>`; }).join('') : '<p class="muted">Aucune séance enregistrée.</p>'}`;
+}
+function renderJSession(i) {
+  const j = journal().find(x => x.i === i); if (!j) return renderJournal();
+  const ex = [...new Set(j.rs.sort((a, b) => a.ordre - b.ordre || a.horodatage - b.horodatage).map(r => r.exercice_id))];
+  const ton = j.rs.reduce((t, r) => t + r.charge_kg * r.reps, 0);
+  return `<button class="link" data-a="sub" data-v="journal">Retour au journal</button><h1>${esc(P.seances[j.seance] ? P.seances[j.seance].nom : j.seance)}</h1>
+    <p class="muted">${fmtDate(j.date, true)}, environ ${fmtDur((j.t1 - j.t0) / 1000 + 300)}, ${fmtNum(Math.round(ton))} kg soulevés</p>
+    <ul class="plan">${ex.map(id => `<li><div class="t"><div class="name">${esc(EX(id).nom)}</div><div>${j.rs.filter(r => r.exercice_id === id).map(setChip).join('')}</div></div></li>`).join('')}</ul>
+    <p class="muted small" style="margin-top:12px">Touche une série pour la corriger ou la supprimer.</p>`;
+}
+
 /* Bilan de la semaine par muscle : séries faites / prévues, zone utile 10 à 20 */
 function weekBounds() {
   const t = todayISO(); const w = [...P.semaines].reverse().find(x => x.debut <= t) || P.semaines[0];
@@ -1323,6 +1496,7 @@ function renderExo(id) {
   const dates = [...new Set(rows.map(r => r.date))].sort().reverse().slice(0, 8);
   return `<button class="link" data-a="back">Retour</button><h1>${esc(ex.nom)}</h1>
     ${fl ? `<div class="kpis"><div><b>${fmtNum(Math.round(fl.last * 2) / 2)} kg</b><span>1RM estimé actuel</span></div><div><b>${fl.last - fl.first >= 0 ? '+' : ''}${fmtNum(Math.round((fl.last - fl.first) * 2) / 2)} kg</b><span>depuis la première séance</span></div></div>` : ''}
+    ${ex.consigne ? `<h2>Technique</h2><p>${esc(ex.consigne)}</p>` : ''}
     <h2>Note</h2>${noteOf(id) ? `<button class="note" data-a="note-open" data-v="${id}">${esc(noteOf(id))}</button>` : `<button class="addnote" data-a="note-open" data-v="${id}">+ Ajouter une note (réglage machine, sensation, consigne…)</button>`}
     <h2>Évolution</h2><p class="muted small">Un point par séance. En orange, le 1RM estimé de ta meilleure série du jour. En pointillé, la charge la plus lourde utilisée en série de travail.</p><div class="card">${ex.mesure === 'temps' ? lineChart([]) : timeChart('exo', [{ name: '1RM estimé', color: 'var(--orange)', pts: fl ? fl.pts : [] }, { name: 'Charge de travail max', color: 'var(--muted)', dash: true, pts: topLoads(id) }], { label: 'Évolution du 1RM estimé et de la charge de travail', empty: 'La courbe apparaîtra après deux séances sur cet exercice.' })}</div>
     <h2>Records</h2><p class="muted small">Votre meilleure charge pour chaque nombre de répétitions. Une alerte s’affiche en séance quand vous en battez un.</p>
@@ -1333,6 +1507,8 @@ function renderSub() {
   if (sub.type === 'exo') return renderExo(sub.id);
   if (sub.type === 'bilan') return renderBilan();
   if (sub.type === 'records') return renderRecords();
+  if (sub.type === 'journal') return renderJournal();
+  if (sub.type === 'jsess') return renderJSession(sub.i);
   if (sub.type === 'plan') {
     const s = plan()[sub.i];
     return `<button class="link" data-a="back">Retour</button><span class="phase-tag" style="display:block;color:${PHASE_COL[phaseKey(s)]}">Semaine ${s.week}, ${phaseLabel(s).toLowerCase()}</span><h1>${esc(P.seances[s.seance].nom)}</h1><p class="muted">${fmtDate(s.date, true)}${s.deplacee ? ` (prévue ${fmtDate(s.dateSlot, true)})` : ''}${s.statut ? ', ' + (s.statut === 'faite' ? 'faite' : 'sautée') : `, environ ${fmtDur(estSession(s))}`}</p>${!s.statut && !(A && A.i === s.i) ? `<div style="margin:8px 0 14px"><button class="btn small ghost" data-a="move-ask" data-v="${s.i}">Changer de jour</button></div>` : ''}${s.statut ? `<div style="margin:8px 0 14px"><button class="btn small ghost" data-a="cancel-ask" data-v="${s.i}">${s.statut === 'faite' ? 'Annuler : remettre à faire' : 'Ne plus la sauter : remettre à faire'}</button></div>` : ''}<div class="stripe" style="background:${PHASE_COL[phaseKey(s)]}"></div>${planList(s, false)}`;
@@ -1375,7 +1551,7 @@ function renderSettings() {
     <p class="muted">À faire une seule fois, dans l’ordre : connecter l’app à votre Google Sheet, puis charger le programme.</p>
     <div class="step form"><h2>1. Connexion au Google Sheet</h2>
       <p class="st ${connected ? 'ok' : cfg.url ? 'ko' : 'muted'}">${connected ? 'Connecté' : cfg.url ? (net.ok ? 'Pas encore testé' : 'Échec : ' + esc(net.msg)) : 'Pas encore connecté'}</p>
-      ${connected && scriptV < 3 ? '<p class="ko small">Script Google à mettre à jour : colle la nouvelle version de Code.gs puis Déployer > Gérer les déploiements > crayon > Nouvelle version. Sans ça, les corrections de séries, le poids et les notes ne sont pas enregistrés dans le Sheet.</p>' : ''}
+      ${connected && scriptV < 5 ? '<p class="ko small">Script Google à mettre à jour : colle la nouvelle version de Code.gs puis Déployer > Gérer les déploiements > crayon > Nouvelle version. Sans ça, les corrections de séries, le poids, les notes et les pas ne sont pas enregistrés dans le Sheet.</p>' : ''}
       <p class="muted small">C’est là que vos séries sont enregistrées. L’adresse est celle obtenue en déployant le script Google (elle se termine par /exec). Le mot de passe est celui saisi dans le script (propriété TOKEN).</p>
       <label for="c-url">Adresse du script</label><input id="c-url" value="${esc(cfg.url)}" autocomplete="off" placeholder="https://script.google.com/macros/s/…/exec">
       <label for="c-tok">Mot de passe</label><input id="c-tok" type="password" value="${esc(cfg.token)}" autocomplete="off">
@@ -1386,6 +1562,9 @@ function renderSettings() {
       <label for="p-file">Fichier</label><input id="p-file" type="file" accept="application/json,.json">
       <div style="margin-top:12px"><button class="btn small ghost" data-a="prog-import">Charger le programme</button></div></div>
     ${activeReplacements().length ? `<div class="step"><h2>Remplacements permanents</h2><p class="muted small">Exercices remplacés « pour les prochaines séances ».</p><div class="opts">${activeReplacements().map(r => `<button class="opt" data-a="rep-undo" data-s="${r.sid}" data-o="${r.ordre}">${esc(P.seances[r.sid].nom)} : ${esc(EX(r.rempl).nom)}<small>à la place de ${esc(EX(r.initial).nom)}. Toucher pour revenir à l’original.</small></button>`).join('')}</div></div>` : ''}
+    <details class="step"><summary><b>iPhone Santé (raccourcis)</b></summary>
+      <p class="small"><b>Pas automatiques.</b> Raccourcis > Automatisation > Nouvelle > Heure de la journée, 23:30, chaque jour, exécuter immédiatement. Actions : « Rechercher des échantillons de santé » (type Nombre de pas, date aujourd’hui), « Calculer les statistiques » (Somme), puis « Obtenir le contenu de l’URL » : adresse du script (celle de l’étape 1), méthode POST, corps JSON avec token = ton mot de passe, action = addPas, data = dictionnaire avec pas = la somme.</p>
+      <p class="small"><b>Séance vers Santé.</b> Raccourcis > nouveau raccourci nommé exactement « Logbook Santé » : « Diviser le texte » de l’entrée par le caractère |, puis « Enregistrer l’entraînement » : type Musculation traditionnelle, début = élément 1, durée = élément 2 en minutes. Le bouton « Envoyer à Santé » en fin de séance le lance.</p></details>
     <div class="step"><h2>Affichage</h2><p class="muted small">Le thème clair est plus lisible dans une salle très éclairée. « Auto » suit le réglage de l’iPhone.</p>
       <div class="seg">${[['dark', 'Sombre'], ['light', 'Clair'], ['auto', 'Auto']].map(([k, l]) => `<button class="${LS.get('theme', 'dark') === k ? 'on' : ''}" data-a="theme" data-v="${k}">${l}</button>`).join('')}</div></div>
     <div class="step"><h2>Vos données</h2>
@@ -1431,6 +1610,16 @@ function renderModal() {
       <div class="opts"><button class="btn" data-a="set-save">Enregistrer la correction</button>
       <button class="opt" data-a="set-del" style="color:var(--red)">${modal.confirmDel ? 'Confirmer : supprimer définitivement' : 'Supprimer cette série'}${r.type === 'normale' && H.series.some(x => x.serie_parent_id === r.id) ? '<small>La dégressive ou le rest-pause rattaché sera aussi supprimé.</small>' : ''}</button>
       <button class="opt" data-a="set-cancel">Annuler</button></div>`;
+  } else if (modal.type === 'pas') {
+    inner = `<h3>Mes pas</h3><p class="muted small">Le total s’affiche dans l’app Santé, onglet Résumé. Une saisie remplace celle du même jour.</p>
+      <div class="seg" style="margin:10px 0">${[['0', 'Aujourd’hui'], ['-1', 'Hier']].map(([k, l]) => `<button class="${String(modal.d) === k ? 'on' : ''}" data-a="pas-day" data-v="${k}">${l}</button>`).join('')}</div>
+      <input id="pas-n" type="number" inputmode="numeric" placeholder="Nombre de pas" value="${modal.v || ''}">
+      <div class="opts" style="margin-top:12px"><button class="btn" data-a="pas-save">Enregistrer</button><button class="opt" data-a="modal-close">Annuler</button></div>`;
+  } else if (modal.type === 'tech') {
+    const ex = EX(modal.id);
+    let tp = '';
+    if (A && curIt() && curIt().exId === modal.id) { const t = curP().tempo; if (t) { const q = tempoParts(t); tp = `<p class="small"><b>Tempo ${t}</b> : ${q[0]} s pour freiner la charge, ${q[1] ? q[1] + ' s de pause en étirement, ' : ''}${q[2] === 'X' ? 'effort explosif' : q[2] + ' s d’effort'}${q[3] ? ', ' + q[3] + ' s de pause en contraction' : ''}.</p>`; } }
+    inner = `<h3>${esc(ex.nom)}</h3><p>${esc(ex.consigne || 'Pas de consigne pour cet exercice.')}</p>${tp}<div class="opts"><button class="opt" data-a="modal-close">Fermer</button></div>`;
   } else if (modal.type === 'note') {
     inner = `<h3>Note : ${esc(EX(modal.id).nom)}</h3><p class="muted small">Elle s’affichera à chaque fois que tu feras cet exercice, et pendant le repos qui le précède.</p>
       ${scriptV < 3 ? '<p class="ko small">Le script Google n’est pas à jour : la note restera sur ce téléphone seulement. Voir Réglages, étape 1.</p>' : ''}
@@ -1574,6 +1763,21 @@ const ACT = {
   'note-open'(d) { modal = { type: 'note', id: d.v }; render(); setTimeout(() => { const t = document.getElementById('note-txt'); if (t) t.focus(); }, 50); },
   'note-save'() { const t = (document.getElementById('note-txt').value || '').trim().slice(0, 300); saveNote(modal.id, t); modal = null; toast(t ? 'Note enregistrée' : 'Note effacée', ''); render(); },
   'note-del'() { saveNote(modal.id, ''); modal = null; toast('Note effacée', ''); render(); },
+  tech(d) { if (!d.v) return; modal = { type: 'tech', id: d.v }; render(); },
+  'gen-timer'() { unlockAudio(); startTimer(300, 'general', 'Cardio léger'); saveA(); render(); },
+  'gen-done'() { A.timer = null; A.step = 'input'; prepareStep(); saveA(); render(); },
+  'deload-ok'(d) { const row = { id: uid(), horodatage: Date.now(), index_seance: -(+d.v), seance: '', date_prevue: '', statut: 'decharge_avancee', date_reelle: '' }; H.seances.push(row); saveH(); enqueue('addSeance', row); toast('Décharge avancée', `Semaine ${d.v} : charges −10 %, moitié des séries.`); render(); },
+  'deload-no'(d) { LS.set('deload-dismiss', +d.v); render(); },
+  'pas-open'() { modal = { type: 'pas', d: 0 }; render(); setTimeout(() => { const t = document.getElementById('pas-n'); if (t) t.focus(); }, 50); },
+  'pas-day'(d) { modal.v = (document.getElementById('pas-n') || {}).value; modal.d = +d.v; render(); },
+  'pas-save'() {
+    const v = Math.round(+(document.getElementById('pas-n').value || 0)); if (!(v > 0)) { toast('Nombre de pas manquant', ''); return; }
+    const date = addDays(todayISO(), modal.d), row = { id: uid(), horodatage: Date.now(), date, pas: v };
+    H.pas = H.pas.filter(p => p.date !== date); H.pas.push(row); saveH(); enqueue('addPas', row); modal = null; toast('Pas enregistrés', fmtInt(v) + ' pas'); render();
+  },
+  jsess(d) { sub = { type: 'jsess', i: +d.v }; render(); scrollTo(0, 0); },
+  sante() { location.href = santeURL(); },
+  rir(d) { const v = 10 - +d.v; A.draft.rpe = A.draft.rpe === v ? null : v; saveA(); render(); },
   'adj-yes'() { const it = A.items[A.adj.item]; it.forceCharge = A.adj.charge; if (A.draft && A.cur.item === A.adj.item) { A.draft.charge = A.adj.charge; delete it.forceCharge; } A.adj = null; saveA(); render(); },
   'adj-no'() { A.adj = null; saveA(); render(); },
   'calib-adj'(d) { A.draft.charge = Math.max(0, A.draft.charge + +d.v); saveA(); render(); },
@@ -1658,7 +1862,7 @@ const ACT = {
   async 'reset-ok'() {
     try {
       await api('reset');
-      H = { series: [], seances: [], modifications: [], poids: H.poids || [], notes: H.notes || [] }; saveH();
+      H = { series: [], seances: [], modifications: [], poids: H.poids || [], notes: H.notes || [], pas: H.pas || [] }; saveH();
       Q = []; LS.set('queue', Q); A = null; saveA(); missedDismissed = false;
       modal = null; toast('Données effacées', 'Vous repartez de zéro.'); render();
     } catch (e) {
