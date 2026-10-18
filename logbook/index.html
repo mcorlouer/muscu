@@ -270,7 +270,7 @@ summary{font:600 21px var(--num);cursor:pointer}
 <div id="toast"></div>
 <script>
 'use strict';
-const APP_VERSION = '8';
+const APP_VERSION = '9';
 
 /* ---------- Utilitaires ---------- */
 const LS = {
@@ -405,7 +405,8 @@ function plan() {
   return S.map(s => {
     const shift = ev.filter(e => e <= s.i).length;
     const rows = H.seances.filter(r => r.index_seance === s.i);
-    const statut = rows.some(r => r.statut === 'faite') ? 'faite' : rows.some(r => r.statut === 'sautee') ? 'sautee' : null;
+    const st = rows.filter(r => r.statut === 'faite' || r.statut === 'sautee' || r.statut === 'annulee').sort((a, b) => a.horodatage - b.horodatage).pop();
+    const statut = st && st.statut !== 'annulee' ? st.statut : null;
     const mv = rows.filter(r => r.statut === 'deplacee' && r.date_reelle).sort((a, b) => a.horodatage - b.horodatage).pop();
     const dateSlot = sl[s.i + shift];
     const date = mv ? String(mv.date_reelle).slice(0, 10) : dateSlot;
@@ -516,6 +517,18 @@ function checkPR(id, c, r) {
   const e = e1rm(c, r);
   if (e && rec.best > 0 && e > rec.best + 0.01) out.push(`1RM estimé ${fmtNum(Math.round(e * 2) / 2)} kg`);
   return out.length ? out : null;
+}
+
+/* ---------- Annuler une séance ---------- */
+function cancelSession(i) {
+  const s = plan()[i];
+  const ids = H.series.filter(r => r.index_seance === i).map(r => r.id);
+  H.series = H.series.filter(r => r.index_seance !== i);
+  const row = { id: uid(), horodatage: Date.now(), index_seance: i, seance: s.seance, date_prevue: s.dateSlot, statut: 'annulee', date_reelle: '' };
+  H.seances.push(row); saveH();
+  ids.forEach(id => enqueue('deleteSerie', { id }));
+  enqueue('addSeance', row);
+  if (A && A.i === i) { A = null; saveA(); releaseWake(); }
 }
 
 /* ---------- Corriger une série ---------- */
@@ -866,7 +879,7 @@ function bilanTable() {
   return rows.length ? `<h2 style="text-align:left">Par rapport à la dernière fois</h2><p class="muted small" style="text-align:left">Meilleure série du jour comparée à la meilleure série de la séance précédente sur le même exercice.</p><table class="bilan" style="text-align:left">${rows.join('')}</table>` : '';
 }
 function tonDelta(s, ton) {
-  const prev = H.seances.filter(r => r.seance === s.seance && r.statut === 'faite' && r.index_seance !== s.i && r.index_seance < s.i).sort((a, b) => b.index_seance - a.index_seance)[0];
+  const pl = plan(), prev = pl.filter(x => x.seance === s.seance && x.statut === 'faite' && x.i < s.i).sort((a, b) => b.i - a.i).map(x => ({ index_seance: x.i }))[0];
   if (!prev) return '';
   const t0 = H.series.filter(r => r.index_seance === prev.index_seance).reduce((t, r) => t + r.charge_kg * r.reps, 0);
   if (!t0) return '';
@@ -900,7 +913,8 @@ function renderActive() {
     return `<div class="empty"><h1>Séance terminée</h1><p class="muted">${esc(P.seances[s.seance].nom)}, semaine ${s.week}</p>
       <table style="margin:22px 0"><tr><td>Durée</td><td class="r">${Math.floor(dur / 60)} h ${z(dur % 60)}</td></tr><tr><td>Séries</td><td class="r">${sets.length}</td></tr><tr><td>Tonnage</td><td class="r">${fmtNum(Math.round(ton))} kg${tonDelta(s, ton)}</td></tr><tr><td>Records battus</td><td class="r">${A.prs}</td></tr></table>
       ${bilanTable()}
-      <button class="btn" data-a="close" style="margin-top:22px">Fermer</button></div>`;
+      <button class="btn" data-a="close" style="margin-top:22px">Fermer</button>
+      <div style="margin-top:16px"><button class="link" data-a="cancel-ask" data-v="${A.i}">Séance lancée par erreur ? L’annuler</button></div></div>`;
   }
   const it = curIt();
   if (A.step === 'choose') {
@@ -1146,7 +1160,7 @@ function renderSub() {
   if (sub.type === 'exo') return renderExo(sub.id);
   if (sub.type === 'plan') {
     const s = plan()[sub.i];
-    return `<button class="link" data-a="back">Retour</button><span class="phase-tag" style="display:block;color:${PHASE_COL[phaseKey(s)]}">Semaine ${s.week}, ${phaseLabel(s).toLowerCase()}</span><h1>${esc(P.seances[s.seance].nom)}</h1><p class="muted">${fmtDate(s.date, true)}${s.deplacee ? ` (prévue ${fmtDate(s.dateSlot, true)})` : ''}${s.statut ? ', ' + (s.statut === 'faite' ? 'faite' : 'sautée') : `, environ ${fmtDur(estSession(s))}`}</p>${!s.statut && !(A && A.i === s.i) ? `<div style="margin:8px 0 14px"><button class="btn small ghost" data-a="move-ask" data-v="${s.i}">Changer de jour</button></div>` : ''}<div class="stripe" style="background:${PHASE_COL[phaseKey(s)]}"></div>${planList(s, false)}`;
+    return `<button class="link" data-a="back">Retour</button><span class="phase-tag" style="display:block;color:${PHASE_COL[phaseKey(s)]}">Semaine ${s.week}, ${phaseLabel(s).toLowerCase()}</span><h1>${esc(P.seances[s.seance].nom)}</h1><p class="muted">${fmtDate(s.date, true)}${s.deplacee ? ` (prévue ${fmtDate(s.dateSlot, true)})` : ''}${s.statut ? ', ' + (s.statut === 'faite' ? 'faite' : 'sautée') : `, environ ${fmtDur(estSession(s))}`}</p>${!s.statut && !(A && A.i === s.i) ? `<div style="margin:8px 0 14px"><button class="btn small ghost" data-a="move-ask" data-v="${s.i}">Changer de jour</button></div>` : ''}${s.statut ? `<div style="margin:8px 0 14px"><button class="btn small ghost" data-a="cancel-ask" data-v="${s.i}">${s.statut === 'faite' ? 'Annuler : remettre à faire' : 'Ne plus la sauter : remettre à faire'}</button></div>` : ''}<div class="stripe" style="background:${PHASE_COL[phaseKey(s)]}"></div>${planList(s, false)}`;
   }
   return '';
 }
@@ -1271,7 +1285,14 @@ function renderModal() {
   } else if (modal.type === 'stop') {
     const any = A.items.some(it => it.sets.length);
     inner = `<h3>Arrêter la séance ?</h3><p class="muted">${any ? 'Les séries déjà validées sont enregistrées et la séance sera marquée comme faite.' : 'Aucune série validée, la séance restera à faire.'}</p>
-      <div class="opts"><button class="opt" data-a="stop-ok">Arrêter</button><button class="opt" data-a="modal-close">Continuer la séance</button></div>`;
+      <div class="opts"><button class="opt" data-a="stop-ok">Arrêter${any ? '<small>Garde les séries et marque la séance comme faite.</small>' : ''}</button>
+      ${any ? `<button class="opt" data-a="cancel-ask" data-v="${A.i}" style="color:var(--red)">Annuler la séance<small>Lancée par erreur : supprime les séries validées, la séance redevient à faire à sa date prévue.</small></button>` : ''}
+      <button class="opt" data-a="modal-close">Continuer la séance</button></div>`;
+  } else if (modal.type === 'cancel') {
+    const s = plan()[modal.i], n = H.series.filter(r => r.index_seance === modal.i).length;
+    inner = `<h3>Annuler ${esc(P.seances[s.seance].nom)} ?</h3><p class="muted">${n ? `Les ${n} série(s) enregistrée(s) pour cette séance seront supprimées, dans l’app et dans le Sheet.` : 'Aucune série enregistrée pour cette séance.'} Elle redeviendra à faire, prévue ${fmtDate(s.date, true)}</p>
+      ${scriptV < 2 && n ? '<p class="ko small">Le script Google n’est pas à jour : les séries resteront dans le Sheet. Voir Réglages, étape 1.</p>' : ''}
+      <div class="opts"><button class="btn danger" data-a="cancel-ok">Oui, annuler la séance</button><button class="opt" data-a="modal-close">Garder</button></div>`;
   } else if (modal.type === 'reset') {
     inner = `<h3>Repartir de zéro ?</h3><p class="muted">Toutes les séries, séances et remplacements seront effacés, dans l’app et dans le Google Sheet. Le programme reste chargé. Impossible d’annuler.</p>
       <div class="opts"><button class="btn danger" data-a="reset-ok">Tout effacer</button><button class="opt" data-a="modal-close">Annuler</button></div>`;
@@ -1393,6 +1414,8 @@ const ACT = {
   },
   'poids-del'(d) { H.poids = H.poids.filter(p => p.id !== d.v); saveH(); enqueue('deletePoids', { id: d.v }); render(); },
   stop() { modal = { type: 'stop' }; render(); },
+  'cancel-ask'(d) { modal = { type: 'cancel', i: +d.v }; render(); },
+  'cancel-ok'() { const s = plan()[modal.i]; cancelSession(modal.i); modal = null; sub = null; view = 'today'; navOpen = false; toast('Séance annulée', `${P.seances[s.seance].nom} est de nouveau à faire.`); render(); },
   'stop-ok'() { modal = null; if (A.items.some(it => it.sets.length)) finishSession(); else closeSession(); },
   close() { closeSession(); },
   /* Chronos */
