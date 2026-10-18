@@ -270,7 +270,7 @@ summary{font:600 21px var(--num);cursor:pointer}
 <div id="toast"></div>
 <script>
 'use strict';
-const APP_VERSION = '9';
+const APP_VERSION = '10';
 
 /* ---------- Utilitaires ---------- */
 const LS = {
@@ -336,6 +336,18 @@ const normSeance = r => ({ ...r, index_seance: num(r.index_seance), horodatage: 
 const normMod = r => ({ ...r, ordre: num(r.ordre), a_partir_de_semaine: num(r.a_partir_de_semaine), horodatage: num(r.horodatage) });
 
 const normPoids = r => ({ ...r, poids_kg: num(r.poids_kg), horodatage: num(r.horodatage), date: String(r.date).slice(0, 10) });
+/* Si le script Google lit les dates dans un autre fuseau que le classeur, elles reviennent décalées d'un jour.
+   On mesure le décalage sur les séries (heure exacte connue) et on corrige toutes les dates reçues. */
+const addDays = (d, n) => { if (!d) return d; const x = parseISO(String(d).slice(0, 10)); x.setDate(x.getDate() + n); return iso(x); };
+function fixDayShift() {
+  const count = {};
+  H.series.forEach(r => { if (!r.horodatage || !r.date) return; const k = Math.round((parseISO(iso(new Date(r.horodatage))) - parseISO(r.date)) / 864e5); count[k] = (count[k] || 0) + 1; });
+  let best = 0, n = 0; Object.keys(count).forEach(k => { if (count[k] > n) { n = count[k]; best = +k; } });
+  if (!best || Math.abs(best) > 1 || n < 3) return;
+  H.series.forEach(r => { r.date = addDays(r.date, best); });
+  H.seances.forEach(r => { r.date_prevue = addDays(r.date_prevue, best); if (r.date_reelle) r.date_reelle = addDays(r.date_reelle, best); });
+  H.poids.forEach(r => { r.date = addDays(r.date, best); });
+}
 /* Rejoue sur les données du Sheet les actions pas encore envoyées */
 function applyOp(q) {
   const d = q.data, has = (l) => l.find(x => x.id === d.id);
@@ -355,6 +367,7 @@ async function refresh() {
     if (j.programme) { P = j.programme; LS.set('programme', P); seqCache = null; }
     H = { series: j.series.map(normSerie), seances: j.seances.map(normSeance), modifications: j.modifications.map(normMod), poids: (j.poids || []).map(normPoids), notes: (j.notes || []).map(r => ({ exercice_id: String(r.exercice_id), texte: String(r.texte ?? ''), horodatage: num(r.horodatage) })) };
     scriptV = j.scriptVersion || 1; LS.set('scriptv', scriptV);
+    fixDayShift();
     for (const q of Q) applyOp(q);
     saveH();
     if (modal && modal.type === 'missed') { const m = firstMissed(); if (m) modal.i = m.i; else modal = null; }
