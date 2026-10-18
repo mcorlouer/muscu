@@ -30,6 +30,8 @@
   box-sizing:border-box;
   padding-top:env(safe-area-inset-top,0px);
 }
+:root[data-theme="light"]{--bg:#F3F4F6;--surf:#FFFFFF;--surf2:#E4E7EB;--line:#D3D8DE;--ink:#1B1F24;--muted:#5C6773;--orange:#D9600A;--yellow:#A87A00;--green:#2C8A55;--red:#C9283B}
+@media (prefers-color-scheme: light){:root[data-theme="auto"]{--bg:#F3F4F6;--surf:#FFFFFF;--surf2:#E4E7EB;--line:#D3D8DE;--ink:#1B1F24;--muted:#5C6773;--orange:#D9600A;--yellow:#A87A00;--green:#2C8A55;--red:#C9283B}}
 *,*::before,*::after{box-sizing:inherit}
 html,body{height:100%;margin:0}
 body{background:var(--bg);color:var(--ink);font:400 17px/1.4 var(--txt);-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none;overscroll-behavior:none}
@@ -198,6 +200,36 @@ nav button.on{color:var(--ink);box-shadow:inset 0 3px 0 var(--acc)}
 .next .nk{font:700 26px var(--num);white-space:nowrap}
 .next .nn{display:block;font-size:14px;font-style:italic;margin-top:3px;opacity:.9}
 textarea{width:100%;min-height:110px;border-radius:12px;border:1px solid var(--line);background:var(--surf);color:var(--ink);font:16px var(--txt);padding:10px}
+.adj{background:var(--surf);border:2px solid var(--acc);border-radius:12px;padding:8px 12px;font-size:15px;line-height:1.3;text-align:left}
+.adj .row{margin-top:8px;gap:8px}
+.adj .row button{background:var(--surf2);border-radius:10px;padding:9px 6px;font:700 17px var(--num)}
+.adj .row button.y{background:var(--acc);color:var(--acc-ink)}
+.calib{background:var(--surf);border-radius:14px;padding:10px 12px;text-align:center}
+.calib .v{font:700 64px/1 var(--num)}
+.calib .v small{font-size:22px;color:var(--muted)}
+.calib .g{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:8px}
+.calib .g button{background:var(--surf2);border-radius:10px;height:44px;font:700 18px var(--num)}
+.paliers{font:600 16px var(--num);color:var(--muted);min-height:20px}
+.recap{background:var(--surf);border-radius:14px;padding:10px 14px;margin:14px 0 4px}
+.recap h3{margin:0 0 4px;font:700 19px var(--num);color:var(--acc)}
+.recap ul{margin:0;padding-left:18px;font-size:15px;line-height:1.4}
+.wk-row{display:grid;grid-template-columns:110px 1fr 54px;gap:10px;align-items:center;padding:6px 0;font-size:15px}
+.wk-row .tr{position:relative;height:14px;border-radius:7px;background:var(--surf2);overflow:hidden}
+.wk-row .zone{position:absolute;top:0;bottom:0;background:var(--green);opacity:.22}
+.wk-row .fill{position:absolute;left:0;top:2px;bottom:2px;border-radius:5px;background:var(--acc)}
+.wk-row .pl{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--ink)}
+.wk-row .n{text-align:right;font:600 15px var(--num)}
+.rec{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)}
+.rec .d{color:var(--muted);font-size:14px;white-space:nowrap}
+.seg{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.seg button{background:var(--surf2);border-radius:10px;padding:11px 4px;font:600 17px var(--num)}
+.seg button.on{background:var(--acc);color:var(--acc-ink)}
+@media print{
+  :root{--bg:#fff;--surf:#fff;--surf2:#eee;--line:#ccc;--ink:#111;--muted:#555}
+  nav,.noprint,#toast,#flash{display:none!important}
+  body{background:#fff}
+  main{padding:0}
+}
 .pz{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--line);font-size:16px}
 
 /* Cycle */
@@ -270,7 +302,7 @@ summary{font:600 21px var(--num);cursor:pointer}
 <div id="toast"></div>
 <script>
 'use strict';
-const APP_VERSION = '10';
+const APP_VERSION = '11';
 
 /* ---------- Utilitaires ---------- */
 const LS = {
@@ -308,6 +340,8 @@ let P = LS.get('programme', null);
 let H = LS.get('hist', { series: [], seances: [], modifications: [], poids: [] });
 H.poids = H.poids || []; H.notes = H.notes || [];
 let scriptV = LS.get('scriptv', 1);
+function applyTheme() { document.documentElement.dataset.theme = LS.get('theme', 'dark'); }
+applyTheme();
 let Q = LS.get('queue', []);
 let A = LS.get('active', null);
 let view = cfg.url ? 'today' : 'settings';
@@ -454,7 +488,7 @@ const EX = id => (P && P.exercices[id]) || { id, nom: id, type: 'isolation', mes
 const defOf = (s, ordre) => P.seances[s.seance].exercices.find(e => e.ordre === ordre);
 function presc(s, def) {
   const p = { ...def.prescriptions[s.phase] };
-  if (s.decharge) { p.series = Math.ceil(p.series / 2); delete p.technique_derniere_serie; }
+  if (s.decharge) { p.series = Math.ceil(p.series / 2); delete p.technique_derniere_serie; if (p.reps_min) p.reps_max = p.reps_min; }
   return p;
 }
 function activeReplacements() {
@@ -513,7 +547,13 @@ function target(id, s, p) {
     if (!best) return lastTime(id).rows[0].charge_kg;
     base = round25(best / (1 + ((p.reps_max || 10) + (s.rir ?? 2)) / 30), true);
   }
-  return s.decharge ? round25(base * 0.9) : base;
+  if (s.decharge) { const ref = dechargeRef(id, s); return round25((ref || base) * 0.9); }
+  return base;
+}
+/* Décharge : −10 % sur la meilleure charge de travail réellement soulevée dans la phase */
+function dechargeRef(id, s) {
+  const rows = workSets(id).filter(r => r.phase === s.phase && !r.decharge && r.charge_kg > 0);
+  return rows.length ? Math.max(...rows.map(r => r.charge_kg)) : null;
 }
 function records(id) {
   const byReps = {}; let best = 0;
@@ -568,9 +608,27 @@ function chargeFor(it) {
   if (!it || !it.exId || EX(it.exId).mesure === 'temps') return null;
   const s = curS(), p = presc(s, defOf(s, it.ordre));
   const prev = [...it.sets].reverse().find(x => x.type === 'normale');
-  let c = prev ? prev.charge_kg : target(it.exId, s, p);
+  let c = it.forceCharge != null ? it.forceCharge : prev ? prev.charge_kg : target(it.exId, s, p);
   if (c === null || c === undefined) { const lt = lastTime(it.exId); c = lt ? lt.rows[0].charge_kg : null; }
   return c;
+}
+
+/* ---------- Repos appris ---------- */
+const restPref = () => LS.get('restpref', {});
+const restFor = (exId, p) => Math.max(30, (p.repos_s || 60) + (restPref()[exId] || 0));
+function learnRest() {
+  if (!A || !A.restAdj) return;
+  const pref = restPref(), hist = LS.get('resthist', {});
+  Object.keys(A.restAdj).forEach(id => {
+    const a = A.restAdj[id]; if (!a.n) return;
+    const avg = Math.round(a.sum / a.n / 15) * 15;
+    hist[id] = [...(hist[id] || []), avg].slice(-3);
+    const h = hist[id];
+    if (h.length >= 2 && Math.sign(h[h.length - 1]) === Math.sign(h[h.length - 2]) && h[h.length - 1] !== 0) {
+      pref[id] = Math.round(((pref[id] || 0) + (h[h.length - 1] + h[h.length - 2]) / 2) / 15) * 15; hist[id] = [];
+    }
+  });
+  LS.set('restpref', pref); LS.set('resthist', hist);
 }
 
 /* ---------- Durée estimée ---------- */
@@ -583,8 +641,9 @@ function setSecs(exId, p) {
 /* Temps d'un exercice : séries + repos + échauffement + technique + changement de poste */
 function exoSecs(exId, p, sets, warm, lastExo, s) {
   if (sets <= 0) return 0;
-  let t = sets * (setSecs(exId, p) + (p.repos_s || 60)) + 60;
-  if (lastExo) t -= p.repos_s || 60;
+  const rs = restFor(exId, p);
+  let t = sets * (setSecs(exId, p) + rs) + 60;
+  if (lastExo) t -= rs;
   if (warm) t += 180;
   if (p.technique_derniere_serie && !s.decharge) t += 45;
   return t;
@@ -627,6 +686,7 @@ function fmtDur(sec) {
   const m = Math.max(5, Math.round(sec / 300) * 5);
   return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h ' + z(m % 60);
 }
+const adjBox = () => A && A.adj && A.adj.item === A.cur.item ? `<div class="adj">${esc(A.adj.msg)}<div class="row"><button class="y" data-a="adj-yes">Oui, ${fmtNum(A.adj.charge)} kg</button><button data-a="adj-no">Garder ${fmtNum(A.adj.from)} kg</button></div></div>` : '';
 const etaTxt = () => { const r = remainingSecs(); return r > 0 ? 'reste ≈ ' + fmtDur(r) : ''; };
 
 /* ---------- Saisie suspecte ---------- */
@@ -644,6 +704,7 @@ function suspectMsg() {
 }
 
 /* ---------- Échauffement guidé ---------- */
+const needCalib = it => { const ex = EX(it.exId); return ex.mesure !== 'temps' && ex.materiel !== 'poids du corps' && !it.calibDone && normalCount(it) === 0 && !H.series.some(r => r.exercice_id === it.exId && r.type === 'normale' && r.charge_kg > 0); };
 const needWarm = it => { const ex = EX(it.exId); return ex.type === 'gros' && ex.materiel !== 'poids du corps' && ex.mesure !== 'temps' && !it.warmDone && normalCount(it) === 0; };
 function warmSets(w, ex) {
   if (!(w > 0)) return [];
@@ -674,16 +735,19 @@ function prepareStep() {
   const it = curIt();
   if (!it.exId) { A.step = 'choose'; return; }
   if (!A.draft) makeDraft();
-  if (A.step === 'input' && needWarm(it)) { A.step = 'warmup'; A.warm = []; }
+  if (A.step === 'input' && needCalib(it)) { A.step = 'calib'; A.calib = []; if (!(A.draft.charge > 0)) A.draft.charge = EX(it.exId).materiel === 'barre' ? 20 : 10; }
+  else if (A.step === 'input' && needWarm(it)) { A.step = 'warmup'; A.warm = []; }
 }
 function makeDraft() {
   const s = curS(), it = curIt(), p = curP();
   const prev = [...it.sets].reverse().find(x => x.type === 'normale');
-  let charge = prev ? prev.charge_kg : target(it.exId, s, p);
+  let charge = it.forceCharge != null ? it.forceCharge : prev ? prev.charge_kg : target(it.exId, s, p);
+  delete it.forceCharge;
   if (charge === null || charge === undefined) { const lt = lastTime(it.exId); charge = lt ? lt.rows[0].charge_kg : 0; }
   A.draft = { reps: p.reps_max ?? 10, charge, rpe: null, duree: p.duree_s || 30 };
 }
 function validate(kind) {
+  if (A.adj && A.adj.item === A.cur.item && normalCount(curIt()) >= 1) A.adj = null;
   const s = curS(), it = curIt(), def = curDef(), p = curP(), ex = EX(it.exId), d = A.draft;
   const parent = kind !== 'normale' ? [...it.sets].reverse().find(x => x.type === 'normale') : null;
   const temps = ex.mesure === 'temps';
@@ -696,6 +760,13 @@ function validate(kind) {
   };
   const pr = kind === 'normale' && !temps ? checkPR(it.exId, r.charge_kg, r.reps) : null;
   it.sets.push(r); H.series.push(r); saveH(); enqueue('addSerie', r);
+  if (kind === 'normale' && !temps && !s.decharge && normalCount(it) === 1 && it.setsPlanned > 1 && r.charge_kg > 0) {
+    const step = (P.progression.pas_kg[it.exId] ?? P.progression.pas_kg.defaut) || 2.5;
+    const easy = r.reps > (p.reps_max || 99) || (r.rpe && r.rpe <= 7 && r.reps >= (p.reps_max || 0));
+    const hard = p.reps_min && r.reps < p.reps_min;
+    if (easy) A.adj = { item: A.cur.item, charge: r.charge_kg + step, from: r.charge_kg, msg: `Série 1 facile (${r.reps} reps${r.rpe ? ', RPE ' + fmtNum(r.rpe) : ''}). Monter pour la suite ?` };
+    else if (hard) { const c = Math.min(r.charge_kg - 2.5, round25(r.charge_kg * 0.95)); if (c > 0) A.adj = { item: A.cur.item, charge: c, from: r.charge_kg, msg: `Série 1 sous la cible (${r.reps} reps pour ${p.reps_min} minimum). Redescendre pour la suite ?` }; }
+  }
   if (pr) { A.prs++; toast('Nouveau record', EX(it.exId).nom + ' : ' + pr.join(', ')); }
   afterSet(kind);
 }
@@ -709,19 +780,21 @@ function afterSet(kind) {
     } else { A.step = 'rp-wait'; startTimer(15, 'rp', 'Rest-pause'); }
     saveA(); render(); return;
   }
-  const rest = p.repos_s;
+  const exId = it.exId, rest = restFor(exId, p), pr = restPref()[exId] || 0;
   if (lastOfExo) {
     if (A.cur.item + 1 >= A.items.length) { finishSession(); return; }
     A.cur.item++;
   }
   A.draft = null;
-  A.step = 'rest'; startTimer(rest, 'rest', 'Repos'); saveA(); render();
+  A.restAdj = A.restAdj || {}; A.restAdj[exId] = A.restAdj[exId] || { sum: 0, n: 0 }; A.restAdj[exId].n++;
+  A.step = 'rest'; startTimer(rest, 'rest', pr ? `Repos (ton habitude : ${pr > 0 ? '+' : '−'}${Math.abs(pr)} s)` : 'Repos'); A.timer.exId = exId; saveA(); render();
 }
 function advanceExo() {
   if (A.cur.item + 1 >= A.items.length) { finishSession(); return; }
   A.cur.item++; A.draft = null; A.step = 'input'; prepareStep(); saveA(); render();
 }
 function finishSession() {
+  learnRest();
   const s = curS();
   const row = { id: uid(), horodatage: Date.now(), index_seance: s.i, seance: s.seance, date_prevue: s.date, statut: 'faite', date_reelle: todayISO() };
   H.seances.push(row); saveH(); enqueue('addSeance', row);
@@ -743,6 +816,7 @@ function tick() {
   if (A && Date.now() - etaT > 15000) { etaT = Date.now(); const e = document.getElementById('eta'); if (e) e.textContent = etaTxt(); }
   if (A && A.timer) {
     const rem = (A.timer.end - Date.now()) / 1000;
+    if (A.timer.kind === 'rest' && !A.timer.pre && A.timer.total > 25 && rem <= 10 && rem > 0) { A.timer.pre = true; beep(true); saveA(); }
     const el = document.getElementById('tdig'); if (el) el.textContent = mmss(rem);
     const bar = document.getElementById('tbar'); if (bar) bar.style.transform = `scaleX(${Math.max(0, Math.min(1, rem / A.timer.total))})`;
     if (rem <= 0) timerDone();
@@ -852,6 +926,27 @@ function planList(s, active) {
   return html + (open ? '</ul>' : '');
 }
 
+/* À retenir avant la séance : charges en hausse, notes, record à battre */
+function recapHtml(s) {
+  const up = [], notes = []; let rec = '';
+  P.seances[s.seance].exercices.forEach(def => {
+    const id = resolveEx(s, def); if (!id) return;
+    const ex = EX(id), p = presc(s, def), nom = ex.nom;
+    if (ex.mesure !== 'temps') {
+      const t = target(id, s, p), lt = lastTime(id);
+      if (t > 0 && lt) { const m = Math.max(...lt.rows.map(r => r.charge_kg)); if (t > m) up.push(`${nom} ${fmtNum(t)} kg (+${fmtNum(t - m)})`); }
+      if (!rec && ex.type === 'gros' && !s.decharge) { const r = records(id).byReps[p.reps_max]; if (r) rec = `Record à battre, ${nom} : ${fmtNum(r)} kg × ${p.reps_max}`; }
+    }
+    const n = noteOf(id); if (n) notes.push(`${nom} : ${n}`);
+  });
+  const li = [];
+  if (up.length) li.push(`En hausse : ${up.slice(0, 3).join(', ')}${up.length > 3 ? ` et ${up.length - 3} autre(s)` : ''}`);
+  if (notes.length) li.push(`Tes notes : ${notes.slice(0, 2).join(' ; ')}${notes.length > 2 ? '…' : ''}`);
+  if (rec) li.push(rec);
+  if (s.decharge) li.unshift('Semaine de décharge : charges à −10 %, moitié des séries, rien à l’échec');
+  return li.length ? `<div class="recap"><h3>À retenir</h3><ul>${li.slice(0, 3).map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>` : '';
+}
+
 /* Séance du jour, avant de commencer */
 function renderToday() {
   if (A) return renderActive();
@@ -863,6 +958,7 @@ function renderToday() {
     <span class="phase-tag">Semaine ${s.week}, ${phaseLabel(s).toLowerCase()}</span>
     <h1>${esc(P.seances[s.seance].nom)}</h1>
     <p class="muted">${when}${s.decharge ? ', semaine allégée' : s.rir === 0 ? ', dernière série à l’échec' : s.rir != null ? `, arrêter ${s.rir} rep${s.rir > 1 ? 's' : ''} avant l’échec` : ''}<br>Durée estimée : environ ${fmtDur(estSession(s))}, échauffement compris</p>
+    ${recapHtml(s)}
     <div class="stripe"></div>
     ${planList(s, false)}
     <div style="margin-top:22px">${isToday ? `<button class="btn" data-a="start">Démarrer la séance</button>` : `<button class="btn ghost" data-a="start">Commencer maintenant</button>`}</div>
@@ -946,7 +1042,20 @@ function renderActive() {
     return `<div class="act">${top}<div class="timer"><div class="lbl">${esc(A.timer.label)}</div><div class="dig" id="tdig">${mmss(rem)}</div>
       <div class="bar"><i id="tbar" style="transform:scaleX(${Math.max(0, rem / A.timer.total)})"></i></div>
       ${A.timer.kind !== 'effort' ? `<div class="row"><button class="btn ghost small" data-a="t-add" data-v="-15">−15 s</button><button class="btn ghost small" data-a="t-add" data-v="15">+15 s</button></div>` : ''}
-      ${stop}${next}</div></div>`;
+      ${stop}${adjBox()}${next}</div></div>`;
+  }
+  if (A.step === 'calib') {
+    const ex = EX(it.exId), p = curP(), c = A.draft.charge;
+    return `<div class="act">${top}
+      <h1 class="exo-name">${esc(ex.nom)}</h1>
+      <div class="sets"><b class="last" style="margin-left:0;padding-left:0">Première fois : trouve ta charge</b></div>
+      <p class="info" style="margin:0">Fais <b>5 reps</b> à chaque palier en montant. Arrête-toi quand 5 reps demandent un vrai effort : c’est ta charge de travail pour ${repsTxt(p)}${ex.unilateral ? ' (charge par côté)' : ''}. Rien n’est enregistré.</p>
+      <div class="calib"><div class="v">${fmtNum(c)}<small> kg</small></div><div class="g">${[-5, -2.5, 2.5, 5, 10].map(v => `<button data-a="calib-adj" data-v="${v}">${v > 0 ? '+' : '−'}${fmtNum(Math.abs(v))}</button>`).join('')}</div></div>
+      <div class="paliers">${A.calib && A.calib.length ? 'Paliers faits : ' + A.calib.map(x => fmtNum(x) + ' kg').join(', ') : ''}</div>
+      <button class="btn ghost" data-a="calib-step">Palier fait, on monte</button>
+      <div style="flex:1"></div>
+      <button class="btn validate" data-a="calib-done">C’est ma charge : ${fmtNum(c)} kg</button>
+      <div class="act-links"><button class="link" data-a="replace">Remplacer</button><button class="link" data-a="skip-ask">Passer</button><button class="link" data-a="stop">Arrêter</button></div></div>`;
   }
   if (A.step === 'warmup') {
     const ex = EX(it.exId), w = A.draft.charge, ws = warmSets(w, ex);
@@ -968,7 +1077,8 @@ function renderActive() {
   else if (A.step === 'rp-input') setLine = `<b class="last">Rest-pause : reps en plus</b>`;
   else { const done = it.sets.filter(x => x.type === 'normale'); setLine = Array.from({ length: it.setsPlanned }, (_, k) => `<i class="${k < n ? 'd' : k === n ? 'c' : ''}"${k < n && done[k] ? ` data-a="set-open" data-v="${done[k].id}"` : ''}>${k + 1}</i>`).join('') + `<b class="${last ? 'last' : ''}">${last ? 'Dernière série' : `Série ${n + 1} sur ${it.setsPlanned}`}</b>`; }
   const tgt = target(it.exId, s, p);
-  const info = `Cible <b>${repsTxt(p)}${tgt > 0 ? `, ${fmtNum(tgt)} kg` : ''}</b>${p.technique_derniere_serie && !s.decharge ? `, ${p.technique_derniere_serie === 'degressive' ? 'dégressive' : 'rest-pause'} en fin d’exercice` : ''}<br>${esc(lastTimeLabel(it.exId))}`;
+  const dref = s.decharge && EX(it.exId).mesure !== 'temps' ? dechargeRef(it.exId, s) : null;
+  const info = (dref ? `<b style="color:var(--acc)">Décharge : ${fmtNum(round25(dref * 0.9))} kg au lieu de ${fmtNum(dref)} kg (−10 %)</b>, sans forcer<br>` : '') + `Cible <b>${repsTxt(p)}${tgt > 0 ? `, ${fmtNum(tgt)} kg` : ''}</b>${p.technique_derniere_serie && !s.decharge ? `, ${p.technique_derniere_serie === 'degressive' ? 'dégressive' : 'rest-pause'} en fin d’exercice` : ''}<br>${esc(lastTimeLabel(it.exId))}`;
   const nx = nextExoInfo();
   const nextBox = nx ? `<div class="next ${last ? 'hot' : ''}"><span class="muted">${last ? 'Après cette série' : 'Exercice suivant'}</span> <b>${esc(nx.nom)}</b> <span class="muted">${nx.txt}</span>${nx.kg ? ` <b>${nx.kg}</b>` : ''}</div>`
     : `<div class="next ${last ? 'hot' : ''}"><b>${last ? 'Dernière série de la séance' : 'Dernier exercice de la séance'}</b></div>`;
@@ -992,6 +1102,7 @@ function renderActive() {
     <div class="sets" style="--n:${Math.max(it.setsPlanned, 4)}">${setLine}</div>
     ${renderTempo(p.tempo)}
     <div class="info">${info}</div>
+    ${adjBox()}
     ${noteOf(it.exId) ? `<button class="note" data-a="note-open" data-v="${it.exId}"><b>Note :</b> ${esc(noteOf(it.exId))}</button>` : `<button class="addnote" data-a="note-open" data-v="${it.exId}">+ Ajouter une note pour les prochaines fois</button>`}
     ${inputs}
     ${action}
@@ -1079,15 +1190,22 @@ function lineChart(pts) {
     ${pts.map((p, i) => `<circle cx="${x(i)}" cy="${y(p.y)}" r="4" fill="var(--ink)"/>`).join('')}
     <text x="${pad}" y="${Hh - 6}">${fmtDate(pts[0].x)}</text><text x="${W - 8}" y="${Hh - 6}" text-anchor="end">${fmtDate(pts[pts.length - 1].x)}</text></svg>`;
 }
-function prCount() {
-  const by = {}, best = {}; let n = 0;
+function prList() {
+  const by = {}, best = {}, out = [];
   [...H.series].filter(r => r.type === 'normale' && r.charge_kg > 0).sort((a, b) => a.horodatage - b.horodatage).forEach(r => {
     const id = r.exercice_id; by[id] = by[id] || {}; const e = e1rm(r.charge_kg, r.reps) || 0;
-    if ((by[id][r.reps] !== undefined && r.charge_kg > by[id][r.reps]) || (best[id] && e > best[id] + 0.01)) n++;
+    const repRec = by[id][r.reps] !== undefined && r.charge_kg > by[id][r.reps], e1Rec = best[id] && e > best[id] + 0.01;
+    if (repRec || e1Rec) out.push({ r, repRec, e1Rec, e, prev: by[id][r.reps] });
     if (r.reps <= 12) by[id][r.reps] = Math.max(by[id][r.reps] || 0, r.charge_kg);
     best[id] = Math.max(best[id] || 0, e);
   });
-  return n;
+  return out;
+}
+const prCount = () => prList().length;
+function renderRecords() {
+  const L = prList().reverse();
+  return `<button class="link" data-a="back">Retour</button><h1>Mur des records</h1><p class="muted small">Chaque fois que tu as battu ta meilleure charge pour un nombre de reps, ou ton 1RM estimé. Du plus récent au plus ancien.</p>
+    ${L.length ? L.map(x => `<div class="rec"><div><b>${esc(EX(x.r.exercice_id).nom)}</b><br>${fmtNum(x.r.charge_kg)} kg × ${x.r.reps}${x.repRec ? ` <span class="muted small">(avant : ${fmtNum(x.prev)} kg)</span>` : ''}${x.e1Rec ? `<br><span class="muted small">1RM estimé ${fmtNum(Math.round(x.e * 2) / 2)} kg</span>` : ''}</div><span class="d">${fmtDate(x.r.date, true)}</span></div>`).join('') : '<p class="muted">Pas encore de record : il faut au moins deux séances sur un exercice.</p>'}`;
 }
 function topLoads(id) {
   const by = {}; workSets(id).forEach(r => { if (r.charge_kg > 0) by[r.date] = Math.max(by[r.date] || 0, r.charge_kg); });
@@ -1117,7 +1235,9 @@ function renderProgres() {
     return `<button data-a="exo" data-v="${id}"><span class="nm">${esc(EX(id).nom)}</span><span class="kg">${fl ? fmtNum(Math.round(fl.last * 2) / 2) + ' kg' : '–'}${gain > 0.4 ? `<span class="up">+${fmtNum(Math.round(gain * 2) / 2)} kg depuis le début</span>` : ''}</span></button>`;
   }).join('')}</div>`).join('');
   return `<h1>Progrès</h1>
+    <div class="row" style="margin-top:10px"><button class="btn small ghost" data-a="sub" data-v="bilan">Bilan du bloc</button><button class="btn small ghost" data-a="sub" data-v="records">Mur des records</button></div>
     <div class="kpis" style="margin-top:12px"><div><b>${done}<span class="muted" style="font-size:18px"> / ${seq().length}</span></b><span>séances faites</span></div><div><b>${H.series.length}</b><span>séries enregistrées</span></div><div><b>${fmtNum(Math.round(totalTon / 100) / 10)} t</b><span>soulevées au total</span></div><div><b>${prCount()}</b><span>records battus</span></div></div>
+    ${weekMuscles()}
     ${poidsSection()}
     <h2>Tonnage par semaine</h2>
     <p class="muted small">Le tonnage additionne charge × répétitions de toutes vos séries : c’est votre volume de travail. Il doit grimper pendant les phases d’hypertrophie, baisser un peu en force, et nettement en décharge.</p>
@@ -1126,7 +1246,30 @@ function renderProgres() {
     <p class="muted small">Le chiffre est votre 1RM estimé : la charge que vous pourriez soulever une seule fois, calculée à partir de vos séries (formule d’Epley). Il permet de comparer une série à 5 reps et une série à 10 reps sur la même échelle. Touchez un exercice pour le détail.</p>
     ${ids.length ? list : '<p class="muted">Rien d’enregistré pour l’instant.</p>'}`;
 }
+/* Bilan de la semaine par muscle : séries faites / prévues, zone utile 10 à 20 */
+function weekBounds() {
+  const t = todayISO(); const w = [...P.semaines].reverse().find(x => x.debut <= t) || P.semaines[0];
+  const end = parseISO(w.debut); end.setDate(end.getDate() + 6);
+  return { w, a: w.debut, z: iso(end) };
+}
+function weekMuscles() {
+  const { w, a, z } = weekBounds(), plannedBy = {}, doneBy = {};
+  plan().filter(s => s.week === w.numero && s.statut !== 'sautee').forEach(s => P.seances[s.seance].exercices.forEach(def => {
+    const id = resolveEx(s, def) || def.choix[0], g = EX(id).groupe; plannedBy[g] = (plannedBy[g] || 0) + presc(s, def).series;
+  }));
+  H.series.filter(r => r.type === 'normale' && r.date >= a && r.date <= z).forEach(r => { const g = EX(r.exercice_id).groupe; doneBy[g] = (doneBy[g] || 0) + 1; });
+  const gs = [...new Set([...Object.keys(plannedBy), ...Object.keys(doneBy)])].filter(Boolean).sort((x, y) => (plannedBy[y] || 0) - (plannedBy[x] || 0));
+  const max = Math.max(22, ...gs.map(g => Math.max(plannedBy[g] || 0, doneBy[g] || 0)));
+  const X = v => (100 * v / max).toFixed(1) + '%';
+  const rows = gs.map(g => `<div class="wk-row"><span>${GROUPES[g] || g}</span><div class="tr" role="img" aria-label="${GROUPES[g] || g} : ${doneBy[g] || 0} séries faites sur ${plannedBy[g] || 0} prévues"><i class="zone" style="left:${X(10)};width:${(100 * 10 / max).toFixed(1)}%"></i><i class="fill" style="width:${X(doneBy[g] || 0)}"></i>${plannedBy[g] ? `<i class="pl" style="left:${X(plannedBy[g])}"></i>` : ''}</div><span class="n">${doneBy[g] || 0} / ${plannedBy[g] || 0}</span></div>`).join('');
+  return `<h2>Semaine ${w.numero} par muscle</h2><p class="muted small">Séries de travail faites / prévues du ${fmtDate(a)} au ${fmtDate(z)} ; Barre pleine : fait. Trait : prévu. Zone verte : 10 à 20 séries par semaine, la fourchette utile pour la croissance.</p><div class="card">${rows || '<p class="muted small">Rien de prévu cette semaine.</p>'}</div>`;
+}
+
 /* Poids de corps */
+/* Moyenne des pesées des 7 derniers jours à chaque date : gomme les variations d'eau */
+function smooth7(pts) {
+  return pts.map(p => { const t = parseISO(p.date).getTime(); const w = pts.filter(q => { const u = parseISO(q.date).getTime(); return u <= t && t - u < 7 * 864e5; }); return { x: p.date, y: w.reduce((a, q) => a + q.poids_kg, 0) / w.length }; });
+}
 function poidsRate() {
   const pts = [...H.poids].filter(p => p.poids_kg > 0).sort((a, b) => a.date < b.date ? -1 : 1);
   if (pts.length < 2) return null;
@@ -1152,9 +1295,26 @@ function poidsSection() {
   }
   const band = pts.length >= 2 ? (() => { const d0 = pts[0].date, w0 = pts[0].poids_kg, dl = pts[pts.length - 1].date, wk = (parseISO(dl) - parseISO(d0)) / (7 * 864e5); return [{ x: d0, lo: w0, hi: w0 }, { x: dl, lo: w0 + 0.25 * wk, hi: w0 + 0.5 * wk }]; })() : null;
   return head + `${lastP ? `<div class="kpis"><div><b>${fmtNum(lastP.poids_kg)} kg</b><span>dernière pesée, ${fmtDate(lastP.date)}</span></div>${status || '<div><b>–</b><span>rythme calculé après une semaine de pesées</span></div>'}</div>` : ''}
-    ${pts.length >= 2 ? `<div class="card" style="margin-top:10px"><p class="muted small" style="margin:0 0 6px">Zone verte : la cible de +0,25 à +0,5 kg par semaine depuis ta première pesée.</p>${timeChart('poids', [{ name: '', color: 'var(--orange)', pts: pts.map(p => ({ x: p.date, y: p.poids_kg })) }], { band, dec: true, minPad: 0.5, label: 'Évolution du poids de corps' })}</div>` : ''}
+    ${pts.length >= 2 ? `<div class="card" style="margin-top:10px"><p class="muted small" style="margin:0 0 6px">Zone verte : la cible de +0,25 à +0,5 kg par semaine depuis ta première pesée. Fie-toi à la moyenne sur 7 jours, pas à la pesée du jour.</p>${timeChart('poids', [{ name: 'Pesées', color: 'var(--muted)', dash: true, pts: pts.map(p => ({ x: p.date, y: p.poids_kg })) }, { name: 'Moyenne 7 jours', color: 'var(--orange)', pts: smooth7(pts) }], { band, dec: true, minPad: 0.5, label: 'Évolution du poids de corps' })}</div>` : ''}
     <div style="margin-top:12px"><button class="btn small ghost" data-a="poids-open">Ajouter une pesée</button></div>
     ${pts.length ? `<details style="margin-top:10px"><summary class="muted small">Pesées enregistrées</summary>${[...pts].reverse().slice(0, 12).map(p => `<div class="pz"><span>${fmtDate(p.date, true)}</span><span><b>${fmtNum(p.poids_kg)} kg</b> <button class="link" data-a="poids-del" data-v="${p.id}">Supprimer</button></span></div>`).join('')}</details>` : ''}`;
+}
+function renderBilan() {
+  const pl = plan(), done = pl.filter(s => s.statut === 'faite').length, last = P.semaines[P.semaines.length - 1];
+  const fin = parseISO(last.debut); fin.setDate(fin.getDate() + 6); const finished = todayISO() > iso(fin);
+  const ton = H.series.reduce((t, r) => t + r.charge_kg * r.reps, 0);
+  const ids = [...new Set(H.series.filter(r => r.type === 'normale').map(r => r.exercice_id))].filter(id => EX(id).mesure !== 'temps');
+  const gains = ids.map(id => { const f = firstLastE1(id); return f && f.pts.length >= 2 ? { id, a: f.first, b: f.last, pc: (f.last / f.first - 1) * 100 } : null; }).filter(Boolean).sort((x, y) => y.pc - x.pc);
+  const pz = [...H.poids].filter(p => p.poids_kg > 0).sort((a, b) => a.date < b.date ? -1 : 1);
+  const r1 = x => fmtNum(Math.round(x * 2) / 2);
+  return `<div class="noprint"><button class="link" data-a="back">Retour</button></div>
+    <h1>${finished ? 'Bilan du bloc' : 'Bilan du bloc, en cours'}</h1><p class="muted">${esc(P.meta.titre)}, du ${fmtDate(P.meta.debut)} au ${fmtDate(P.meta.fin)}${finished ? '' : `, point au ${fmtDate(todayISO())}`}</p>
+    <div class="kpis" style="margin-top:12px"><div><b>${done} / ${pl.length}</b><span>séances faites</span></div><div><b>${H.series.filter(r => r.type === 'normale').length}</b><span>séries de travail</span></div><div><b>${fmtNum(Math.round(ton / 100) / 10)} t</b><span>soulevées</span></div><div><b>${prCount()}</b><span>records battus</span></div></div>
+    ${pz.length >= 2 ? `<h2>Poids de corps</h2><p>${fmtNum(pz[0].poids_kg)} kg le ${fmtDate(pz[0].date)}, ${fmtNum(pz[pz.length - 1].poids_kg)} kg le ${fmtDate(pz[pz.length - 1].date)} : <b>${pz[pz.length - 1].poids_kg - pz[0].poids_kg >= 0 ? '+' : ''}${fmtNum(Math.round((pz[pz.length - 1].poids_kg - pz[0].poids_kg) * 10) / 10)} kg</b>.</p>` : ''}
+    <h2>Force gagnée par exercice</h2><p class="muted small">1RM estimé à la première et à la dernière séance de l’exercice.</p>
+    ${gains.length ? `<table><tr><th>Exercice</th><th class="r">Début</th><th class="r">Fin</th><th class="r">Gain</th></tr>${gains.map(g => `<tr><td>${esc(EX(g.id).nom)}</td><td class="r">${r1(g.a)}</td><td class="r">${r1(g.b)}</td><td class="r"><b>${g.pc >= 0 ? '+' : ''}${Math.round(g.pc)} %</b></td></tr>`).join('')}</table>` : '<p class="muted">Il faut au moins deux séances par exercice.</p>'}
+    <h2>Derniers records</h2>${prList().slice(-8).reverse().map(x => `<div class="rec"><span>${esc(EX(x.r.exercice_id).nom)} : ${fmtNum(x.r.charge_kg)} kg × ${x.r.reps}</span><span class="d">${fmtDate(x.r.date)}</span></div>`).join('') || '<p class="muted">Aucun pour l’instant.</p>'}
+    <div class="noprint" style="margin-top:24px"><button class="btn ghost" data-a="print">Imprimer ou enregistrer en PDF</button><p class="muted small" style="margin-top:8px">Sur iPhone : Imprimer, puis écarter deux doigts sur l’aperçu pour obtenir le PDF à partager.</p></div>`;
 }
 function renderExo(id) {
   const ex = EX(id), rows = workSets(id);
@@ -1171,6 +1331,8 @@ function renderExo(id) {
 }
 function renderSub() {
   if (sub.type === 'exo') return renderExo(sub.id);
+  if (sub.type === 'bilan') return renderBilan();
+  if (sub.type === 'records') return renderRecords();
   if (sub.type === 'plan') {
     const s = plan()[sub.i];
     return `<button class="link" data-a="back">Retour</button><span class="phase-tag" style="display:block;color:${PHASE_COL[phaseKey(s)]}">Semaine ${s.week}, ${phaseLabel(s).toLowerCase()}</span><h1>${esc(P.seances[s.seance].nom)}</h1><p class="muted">${fmtDate(s.date, true)}${s.deplacee ? ` (prévue ${fmtDate(s.dateSlot, true)})` : ''}${s.statut ? ', ' + (s.statut === 'faite' ? 'faite' : 'sautée') : `, environ ${fmtDur(estSession(s))}`}</p>${!s.statut && !(A && A.i === s.i) ? `<div style="margin:8px 0 14px"><button class="btn small ghost" data-a="move-ask" data-v="${s.i}">Changer de jour</button></div>` : ''}${s.statut ? `<div style="margin:8px 0 14px"><button class="btn small ghost" data-a="cancel-ask" data-v="${s.i}">${s.statut === 'faite' ? 'Annuler : remettre à faire' : 'Ne plus la sauter : remettre à faire'}</button></div>` : ''}<div class="stripe" style="background:${PHASE_COL[phaseKey(s)]}"></div>${planList(s, false)}`;
@@ -1224,6 +1386,8 @@ function renderSettings() {
       <label for="p-file">Fichier</label><input id="p-file" type="file" accept="application/json,.json">
       <div style="margin-top:12px"><button class="btn small ghost" data-a="prog-import">Charger le programme</button></div></div>
     ${activeReplacements().length ? `<div class="step"><h2>Remplacements permanents</h2><p class="muted small">Exercices remplacés « pour les prochaines séances ».</p><div class="opts">${activeReplacements().map(r => `<button class="opt" data-a="rep-undo" data-s="${r.sid}" data-o="${r.ordre}">${esc(P.seances[r.sid].nom)} : ${esc(EX(r.rempl).nom)}<small>à la place de ${esc(EX(r.initial).nom)}. Toucher pour revenir à l’original.</small></button>`).join('')}</div></div>` : ''}
+    <div class="step"><h2>Affichage</h2><p class="muted small">Le thème clair est plus lisible dans une salle très éclairée. « Auto » suit le réglage de l’iPhone.</p>
+      <div class="seg">${[['dark', 'Sombre'], ['light', 'Clair'], ['auto', 'Auto']].map(([k, l]) => `<button class="${LS.get('theme', 'dark') === k ? 'on' : ''}" data-a="theme" data-v="${k}">${l}</button>`).join('')}</div></div>
     <div class="step"><h2>Vos données</h2>
       <p class="muted small">${H.series.length} série(s) enregistrée(s)${Q.length ? `, ${Q.length} en attente d’envoi` : ''}.</p>
       <div class="opts"><button class="opt" data-a="sync">Recharger depuis le Sheet<small>Si vous avez corrigé des lignes directement dans Google Sheets.</small></button>
@@ -1241,7 +1405,7 @@ function renderModal() {
   let inner = '';
   if (modal.type === 'missed') {
     const s = plan()[modal.i];
-    inner = `<h3>Séance non faite</h3><p>${esc(P.seances[s.seance].nom)}, prévue ${fmtDate(s.date, true)}.</p>
+    inner = `<h3>Séance non faite</h3><p>${esc(P.seances[s.seance].nom)}, prévue ${fmtDate(s.date, true)}</p>
       <div class="opts"><button class="opt" data-a="move-ask" data-v="${s.i}">La faire un autre jour<small>Tu choisis le jour, le reste du planning ne bouge pas.</small></button>
       <button class="opt" data-a="missed" data-v="decalee">Tout décaler<small>Elle devient la prochaine séance, tout le planning glisse d’un créneau.</small></button>
       <button class="opt" data-a="missed" data-v="sautee">Sauter<small>Elle est abandonnée, le planning ne bouge pas.</small></button>
@@ -1363,7 +1527,7 @@ const ACT = {
     if (A.draft.duree < 10) { A.step = 'input'; modal = { type: 'suspect', msg: suspectMsg(), kind: 'normale', effort: true }; saveA(); render(); return; }
     validate('normale');
   },
-  't-add'(d) { A.timer.end += (+d.v) * 1000; A.timer.total = Math.max(1, A.timer.total + (+d.v)); saveA(); tick(); },
+  't-add'(d) { if (A.timer.kind === 'rest' && A.timer.exId && A.restAdj && A.restAdj[A.timer.exId]) A.restAdj[A.timer.exId].sum += +d.v; A.timer.end += (+d.v) * 1000; A.timer.total = Math.max(1, A.timer.total + (+d.v)); saveA(); tick(); },
   't-skip'() { A.timer.end = Date.now(); tick(); },
   sets(d) {
     const it = curIt(), n = normalCount(it);
@@ -1379,7 +1543,7 @@ const ACT = {
       const row = { id: uid(), horodatage: Date.now(), seance: s.seance, ordre: def.ordre, exercice_initial: def.exercice, exercice_remplacant: id, a_partir_de_semaine: s.week };
       H.modifications.push(row); saveH(); enqueue('addModification', row);
     }
-    it.exId = id; A.draft = null; makeDraft(); modal = null; saveA(); render();
+    it.exId = id; A.draft = null; makeDraft(); if (A.step === 'calib' || A.step === 'warmup') { A.step = 'input'; prepareStep(); } modal = null; saveA(); render();
   },
   'rep-undo'(d) {
     const def = P.seances[d.s].exercices.find(e => e.ordre === +d.o); const ns = nextSession();
@@ -1410,6 +1574,14 @@ const ACT = {
   'note-open'(d) { modal = { type: 'note', id: d.v }; render(); setTimeout(() => { const t = document.getElementById('note-txt'); if (t) t.focus(); }, 50); },
   'note-save'() { const t = (document.getElementById('note-txt').value || '').trim().slice(0, 300); saveNote(modal.id, t); modal = null; toast(t ? 'Note enregistrée' : 'Note effacée', ''); render(); },
   'note-del'() { saveNote(modal.id, ''); modal = null; toast('Note effacée', ''); render(); },
+  'adj-yes'() { const it = A.items[A.adj.item]; it.forceCharge = A.adj.charge; if (A.draft && A.cur.item === A.adj.item) { A.draft.charge = A.adj.charge; delete it.forceCharge; } A.adj = null; saveA(); render(); },
+  'adj-no'() { A.adj = null; saveA(); render(); },
+  'calib-adj'(d) { A.draft.charge = Math.max(0, A.draft.charge + +d.v); saveA(); render(); },
+  'calib-step'() { A.calib = [...(A.calib || []), A.draft.charge]; const c = A.draft.charge; A.draft.charge = c + (c < 40 ? 5 : 10); saveA(); render(); },
+  'calib-done'() { const it = curIt(); it.calibDone = true; it.warmDone = true; A.step = 'input'; saveA(); render(); },
+  theme(d) { LS.set('theme', d.v); applyTheme(); render(); },
+  sub(d) { sub = { type: d.v }; render(); scrollTo(0, 0); },
+  print() { window.print(); },
   'skip-ask'() { modal = { type: 'skip' }; render(); },
   'skip-ok'() { modal = null; advanceExo(); },
   'warm-tick'(d) { A.warm = A.warm || []; A.warm[+d.v] = !A.warm[+d.v]; saveA(); render(); },
