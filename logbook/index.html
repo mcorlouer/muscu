@@ -321,7 +321,7 @@ summary{font:600 21px var(--num);cursor:pointer}
 <div id="toast"></div>
 <script>
 'use strict';
-const APP_VERSION = '12';
+const APP_VERSION = '13';
 
 /* ---------- Utilitaires ---------- */
 const LS = {
@@ -349,7 +349,7 @@ const round25 = (x, down) => (down ? Math.floor : Math.round)(x / 2.5) * 2.5;
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 const mmss = s => { s = Math.max(0, Math.ceil(s)); return Math.floor(s / 60) + ':' + z(s % 60); };
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-const e1rm = (c, r) => (c > 0 && r >= 1 && r <= 12) ? c * (1 + r / 30) : null;
+const e1rm = (c, r) => (c > 0 && r >= 1 && r <= 20) ? c * (1 + r / 30) : null;
 const num = v => (v === '' || v === null || v === undefined) ? null : Number(v);
 const bool = v => v === true || v === 'TRUE' || v === 'true' || v === 1;
 
@@ -613,20 +613,23 @@ function dechargeRef(id, s) {
   const rows = workSets(id).filter(r => r.phase === s.phase && !r.decharge && r.charge_kg > 0);
   return rows.length ? Math.max(...rows.map(r => r.charge_kg)) : null;
 }
+/* Record de reps : meilleure charge jamais tenue pour AU MOINS ce nombre de reps.
+   100 kg × 11 n'est pas un record si tu as déjà fait 100 kg × 15. */
+function recordVs(prev, c, r) {
+  const rows = prev.filter(x => x.charge_kg > 0); if (!rows.length || !(c > 0)) return { repRec: false, e1Rec: false };
+  const atLeast = rows.filter(x => x.reps >= r), prevBest = atLeast.length ? Math.max(...atLeast.map(x => x.charge_kg)) : null;
+  const best = Math.max(0, ...rows.map(x => e1rm(x.charge_kg, x.reps) || 0)), e = e1rm(c, r) || 0;
+  return { repRec: prevBest !== null && c > prevBest, prevBest, e1Rec: best > 0 && e > best + 0.01, e };
+}
 function records(id) {
-  const byReps = {}; let best = 0;
-  for (const r of workSets(id)) {
-    if (r.reps >= 1 && r.reps <= 12 && r.charge_kg > 0) byReps[r.reps] = Math.max(byReps[r.reps] || 0, r.charge_kg);
-    const e = e1rm(r.charge_kg, r.reps); if (e && e > best) best = e;
-  }
-  return { byReps, best };
+  const rows = workSets(id).filter(x => x.charge_kg > 0), byReps = {};
+  [...new Set(rows.map(x => x.reps))].filter(n => n >= 1).forEach(n => { byReps[n] = Math.max(...rows.filter(x => x.reps >= n).map(x => x.charge_kg)); });
+  return { byReps, best: Math.max(0, ...rows.map(x => e1rm(x.charge_kg, x.reps) || 0)) };
 }
 function checkPR(id, c, r) {
-  if (!(c > 0)) return null;
-  const rec = records(id); const out = [];
-  if (rec.byReps[r] !== undefined && c > rec.byReps[r]) out.push(`${fmtNum(c)} kg × ${r}`);
-  const e = e1rm(c, r);
-  if (e && rec.best > 0 && e > rec.best + 0.01) out.push(`1RM estimé ${fmtNum(Math.round(e * 2) / 2)} kg`);
+  const v = recordVs(workSets(id), c, r), out = [];
+  if (v.repRec) out.push(`${fmtNum(c)} kg × ${r}`);
+  if (v.e1Rec) out.push(`1RM estimé ${fmtNum(Math.round(v.e * 2) / 2)} kg`);
   return out.length ? out : null;
 }
 
@@ -1271,13 +1274,12 @@ function lineChart(pts) {
     <text x="${pad}" y="${Hh - 6}">${fmtDate(pts[0].x)}</text><text x="${W - 8}" y="${Hh - 6}" text-anchor="end">${fmtDate(pts[pts.length - 1].x)}</text></svg>`;
 }
 function prList() {
-  const by = {}, best = {}, out = [];
+  const seen = {}, out = [];
   [...H.series].filter(r => r.type === 'normale' && r.charge_kg > 0).sort((a, b) => a.horodatage - b.horodatage).forEach(r => {
-    const id = r.exercice_id; by[id] = by[id] || {}; const e = e1rm(r.charge_kg, r.reps) || 0;
-    const repRec = by[id][r.reps] !== undefined && r.charge_kg > by[id][r.reps], e1Rec = best[id] && e > best[id] + 0.01;
-    if (repRec || e1Rec) out.push({ r, repRec, e1Rec, e, prev: by[id][r.reps] });
-    if (r.reps <= 12) by[id][r.reps] = Math.max(by[id][r.reps] || 0, r.charge_kg);
-    best[id] = Math.max(best[id] || 0, e);
+    const prev = seen[r.exercice_id] = seen[r.exercice_id] || [];
+    const v = recordVs(prev, r.charge_kg, r.reps);
+    if (v.repRec || v.e1Rec) out.push({ r, repRec: v.repRec, e1Rec: v.e1Rec, e: v.e, prev: v.prevBest });
+    prev.push(r);
   });
   return out;
 }
@@ -1499,8 +1501,8 @@ function renderExo(id) {
     ${ex.consigne ? `<h2>Technique</h2><p>${esc(ex.consigne)}</p>` : ''}
     <h2>Note</h2>${noteOf(id) ? `<button class="note" data-a="note-open" data-v="${id}">${esc(noteOf(id))}</button>` : `<button class="addnote" data-a="note-open" data-v="${id}">+ Ajouter une note (réglage machine, sensation, consigne…)</button>`}
     <h2>Évolution</h2><p class="muted small">Un point par séance. En orange, le 1RM estimé de ta meilleure série du jour. En pointillé, la charge la plus lourde utilisée en série de travail.</p><div class="card">${ex.mesure === 'temps' ? lineChart([]) : timeChart('exo', [{ name: '1RM estimé', color: 'var(--orange)', pts: fl ? fl.pts : [] }, { name: 'Charge de travail max', color: 'var(--muted)', dash: true, pts: topLoads(id) }], { label: 'Évolution du 1RM estimé et de la charge de travail', empty: 'La courbe apparaîtra après deux séances sur cet exercice.' })}</div>
-    <h2>Records</h2><p class="muted small">Votre meilleure charge pour chaque nombre de répétitions. Une alerte s’affiche en séance quand vous en battez un.</p>
-    ${Object.keys(rec.byReps).length ? `<table><tr><th>Répétitions</th><th class="r">Meilleure charge</th></tr>${Object.keys(rec.byReps).sort((a, b) => a - b).map(r => `<tr><td>${r}</td><td class="r">${fmtNum(rec.byReps[r])} kg</td></tr>`).join('')}</table>` : '<p class="muted">Aucun record pour l’instant.</p>'}
+    <h2>Records</h2><p class="muted small">Ta meilleure charge tenue pour au moins ce nombre de répétitions. Une alerte s’affiche en séance quand tu en bats un.</p>
+    ${Object.keys(rec.byReps).length ? `<table><tr><th>Au moins</th><th class="r">Meilleure charge</th></tr>${Object.keys(rec.byReps).sort((a, b) => a - b).map(r => `<tr><td>${r} reps</td><td class="r">${fmtNum(rec.byReps[r])} kg</td></tr>`).join('')}</table>` : '<p class="muted">Aucun record pour l’instant.</p>'}
     <h2>Dernières séances</h2><p class="muted small">Touche une série pour la corriger ou la supprimer.</p><table>${dates.map(d => { const rs = H.series.filter(r => r.exercice_id === id && r.date === d).sort((a, b) => a.numero_serie - b.numero_serie || a.horodatage - b.horodatage); return `<tr><td style="vertical-align:top;padding-top:10px">${fmtDate(d)}</td><td class="r">${rs.map(setChip).join('')}</td></tr>`; }).join('')}</table>`;
 }
 function renderSub() {
